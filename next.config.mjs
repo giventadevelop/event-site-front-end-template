@@ -1,4 +1,20 @@
 /** @type {import('next').NextConfig} */
+
+// Amplify/CI: default Next.js uses several parallel workers for "Collecting page data".
+// On memory-limited build images, spawn ENOMEM fails when heap is large and workers > 1.
+const isCiBuild =
+  process.env.CI === 'true' ||
+  process.env.CI === '1' ||
+  Boolean(process.env.AWS_APP_ID);
+const parsedBuildWorkers = process.env.NEXT_BUILD_WORKERS
+  ? Number.parseInt(process.env.NEXT_BUILD_WORKERS, 10)
+  : NaN;
+const buildWorkerCount = Number.isFinite(parsedBuildWorkers)
+  ? Math.max(1, parsedBuildWorkers)
+  : isCiBuild
+    ? 1
+    : undefined;
+
 const nextConfig = {
   // Do NOT use output: 'standalone' for AWS Amplify Hosting SSR.
   // Standalone adds .next/standalone/ (traced node_modules + server) while .next/server still
@@ -22,10 +38,6 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'mosc.in',
-      },
-      {
-        protocol: 'https',
-        hostname: 'www.mosc-temp.com',
       },
       {
         protocol: 'https',
@@ -122,16 +134,21 @@ const nextConfig = {
           },
         ],
       },
-      // Allow Next.js static assets to be cached (they have unique hashes)
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
+      // Production only: long-cache hashed webpack chunks. In dev, custom Cache-Control on
+      // /_next/static breaks HMR and can cause ChunkLoadError (timeout loading app/layout.js).
+      ...(process.env.NODE_ENV === 'production'
+        ? [
+            {
+              source: '/_next/static/:path*',
+              headers: [
+                {
+                  key: 'Cache-Control',
+                  value: 'public, max-age=31536000, immutable',
+                },
+              ],
+            },
+          ]
+        : []),
     ];
   },
 
@@ -142,6 +159,20 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '50mb', // Increase from default 1mb to 50mb for file uploads
     },
+    ...(buildWorkerCount !== undefined ? { cpus: buildWorkerCount } : {}),
+    // CI/Amplify: lower peak webpack RAM (slightly longer compile). See Next.js memory-usage guide.
+    ...(isCiBuild ? { webpackMemoryOptimizations: true } : {}),
+    // Smaller per-route server bundles (922+ pages — helps Amplify ~220MB .next cap)
+    optimizePackageImports: [
+      'lucide-react',
+      'react-icons',
+      'react-icons/fa',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-tooltip',
+    ],
   },
 
   // Keep large / native deps out of the webpack server bundle; load from node_modules at runtime.
@@ -157,6 +188,28 @@ const nextConfig = {
     'svix',
     'jsonwebtoken',
   ],
+
+  // Shrink per-route file traces (Amplify SSR ~220MB deploy cap). See scripts/prune-amplify-next-artifact.mjs
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@swc/core-linux-x64-gnu/**',
+      'node_modules/@swc/core-linux-x64-musl/**',
+      'node_modules/@esbuild/linux-x64/**',
+      'node_modules/@esbuild/linux-arm64/**',
+      'node_modules/@swc/core-darwin-*/**',
+      'node_modules/@swc/core-win32-*/**',
+      'node_modules/esbuild-darwin-*/**',
+      'node_modules/esbuild-windows-*/**',
+      'node_modules/webpack/**',
+      'node_modules/typescript/**',
+      'node_modules/@anthropic-ai/**',
+      'node_modules/@img/**',
+      'node_modules/playwright/**',
+      'node_modules/playwright-core/**',
+      'node_modules/prettier/**',
+      'node_modules/eslint/**',
+    ],
+  },
 
   env: {
     // Clerk environment variables
@@ -227,6 +280,16 @@ const nextConfig = {
     // Liturgical Calendar data source (strapi | external)
     LITURGY_DATA_SOURCE: process.env.LITURGY_DATA_SOURCE || process.env.AMPLIFY_LITURGY_DATA_SOURCE || 'external',
     AMPLIFY_LITURGY_DATA_SOURCE: process.env.AMPLIFY_LITURGY_DATA_SOURCE,
+
+    // Downloads page: merge public official documents from API (see PRD_FRONTEND.md)
+    NEXT_PUBLIC_MOSC_DOWNLOADS_DATA_DRIVEN: process.env.NEXT_PUBLIC_MOSC_DOWNLOADS_DATA_DRIVEN,
+    AMPLIFY_NEXT_PUBLIC_MOSC_DOWNLOADS_DATA_DRIVEN: process.env.AMPLIFY_NEXT_PUBLIC_MOSC_DOWNLOADS_DATA_DRIVEN,
+
+    // Admin official docs: when backend GET /api/official-document-categories returns 404, use built-in slug list (set false to disable)
+    NEXT_PUBLIC_OFFICIAL_DOCUMENT_CATEGORY_FALLBACK:
+      process.env.NEXT_PUBLIC_OFFICIAL_DOCUMENT_CATEGORY_FALLBACK,
+    AMPLIFY_NEXT_PUBLIC_OFFICIAL_DOCUMENT_CATEGORY_FALLBACK:
+      process.env.AMPLIFY_NEXT_PUBLIC_OFFICIAL_DOCUMENT_CATEGORY_FALLBACK,
   },
 };
 

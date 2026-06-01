@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import QuickLinks from '../components/QuickLinks';
 import SyroPageBanner from '../components/SyroPageBanner';
+import { MoscHubCardMedia } from '../components/MoscHubCardMedia';
 import {
   MOSC_REDESIGN_CARD,
   MOSC_REDESIGN_CARD_HOVER,
@@ -30,7 +31,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'His Holiness Baselios Paulos I, The First Catholicos of the East in Malankara (1912–1913)',
     excerpt:
       'His Holiness was born on 19 January 1836 to Murimattom Kurian and Mariamma in Kolencherry. He received deaconship from Cheppad Mar Dionysius in 1843 and in 1852 he was ordained...',
-    image: 'https://mosc.in/wp-content/uploads/2014/12/Untitled-11.jpg',
+    image: '/images/catholicate/Catholicos-1.jpg',
     href: '/mosc-redesign/catholicate/his-holiness-baselios-paulos-i-1st-catholicos-of-the-east-in-malankara',
     alt: 'His Holiness Baselios Paulos I',
     internal: true,
@@ -39,7 +40,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'His Holiness Baselios Geevarghese I, The Second Catholicos of the East in Malankara (1925–1928)',
     excerpt:
       "His Holiness was born in 1870 as the second son of Karuchira Paulose. He was ordained as 'Koruya' on 13 June 1885, as deacon in 1892, on 16 August 1896...",
-    image: 'https://mosc.in/wp-content/uploads/2014/12/Untitled-12.jpg',
+    image: '/images/catholicate/Catholicos-2.jpg',
     href: '/mosc-redesign/catholicate/his-holiness-baselios-geevarghese-i-second-catholicos-of-the-east-in-malankara',
     alt: 'His Holiness Baselios Geevarghese I',
     internal: true,
@@ -48,7 +49,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'His Holiness Baselios Geevarghese II, The Third Catholicos of the East in Malankara (1929–1964)',
     excerpt:
       'His Holiness was born to Ulahannan and Naithi of Kallaserri family in Kurichi, Kottayam on 16 June 1874. On 24 April 1892, Kadavil Paulose Mar Athanasios ordained him as deacon...',
-    image: 'https://mosc.in/wp-content/uploads/2015/01/geevar.jpg',
+    image: '/images/catholicate/Catholicos-3.jpg',
     href: '/mosc-redesign/catholicate/his-holiness-baselios-geevarghese-ii-third-catholicos-of-the-east-in-malankara',
     alt: 'His Holiness Baselios Geevarghese II',
     internal: true,
@@ -57,7 +58,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'His Holiness Baselios Augen I, The Fourth Catholicos of the East in Malankara (1964–1975)',
     excerpt:
       'His Holiness was born on 26 June 1884 at Perumbavoor, Vengola, to Abraham Kathanar of Chettakulathukara family. He was ordained as deacon by Kadavil Paulose Mar Athanasios and in...',
-    image: 'https://mosc.in/wp-content/uploads/2015/01/augen.jpg',
+    image: '/images/catholicate/Catholicos-4.jpg',
     href: '/mosc-redesign/catholicate/his-holiness-baselios-oughen-i-the-fourth-catholicos-of-the-east-in-malankara',
     alt: 'His Holiness Baselios Augen I',
     internal: true,
@@ -66,7 +67,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'His Holiness Baselios Marthoma Mathews I, The Fifth Catholicos of the East in Malankara (1975–1991)',
     excerpt:
       'His Holiness was born on 27th March 1907 as the youngest son of Vattakunnel Kurien Kathanar and Olesha Pulickaparampil Mariamma in Kottayam. He took his B.A, B.D. degrees. Even as...',
-    image: 'https://mosc.in/wp-content/uploads/2015/01/mathews-i.jpg',
+    image: '/images/catholicate/Catholicos-5.jpg',
     href: '/mosc-redesign/catholicate/his-holiness-baselios-marthoma-mathews-i-fifth-catholicos-of-the-east-in-malankara',
     alt: 'His Holiness Baselios Marthoma Mathews I',
     internal: true,
@@ -75,7 +76,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'His Holiness Baselios Marthoma Mathews II, The Sixth Catholicos of the East in Malankara (1991–2005)',
     excerpt:
       'His Holiness Moran Mar Baselios Marthoma Mathews II, Catholicos of the East, and 89th successor to the Holy Apostolic Throne of St. Thomas was enthroned on 29 April 1991. He...',
-    image: 'https://mosc.in/wp-content/uploads/2015/01/sas.jpg',
+    image: '/images/catholicate/Catholicos-6.jpg',
     href: '/mosc-redesign/catholicate/his-holiness-baselios-marthoma-mathews-ii-sixth-catholicos-of-the-east-in-malankara',
     alt: 'His Holiness Baselios Marthoma Mathews II',
     internal: true,
@@ -84,7 +85,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'His Holiness Baselios Marthoma Didymos I, The Seventh Catholicos of the East in Malankara (2005–2010)',
     excerpt:
       'His Holiness was consecrated and enthroned at Parumala Seminary as Catholicoi of the East in the Apostolic throne of St. Thomas on 31 October 2005. He is the seventh Catholicos since the...',
-    image: 'https://mosc.in/wp-content/uploads/2015/01/didymus.jpg',
+    image: '/images/catholicate/Catholicos-7.jpg',
     href: '/mosc-redesign/catholicate/his-holiness-baselios-marthoma-didymos-i-seventh-catholicos-of-the-east-in-malankara',
     alt: 'His Holiness Baselios Marthoma Didymos I',
     internal: true,
@@ -93,7 +94,7 @@ const catholicosCards: CatholicosCard[] = [
     title: 'H.H. Baselios Marthoma Paulose II, The Eighth Catholicos of the East in Malankara (2010–2021)',
     excerpt:
       'His Holiness Baselios Marthoma Paulose II was enthroned as the Catholicos of the East & Malankara Metropolitan (the Supreme Head of the Malankara Orthodox Syrian Church of India) on Monday, 1st...',
-    image: 'https://mosc.in/wp-content/uploads/2015/01/bava.jpg',
+    image: '/images/catholicate/Catholicos-8.jpg',
     href: '/mosc-redesign/catholicate/h-h-baselios-marthoma-paulose-ii',
     alt: 'H.H. Baselios Marthoma Paulose II',
     internal: true,
@@ -161,25 +162,22 @@ const CatholicatePage = () => {
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-12">
+          <div className="catholicate-card-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-12">
             {catholicosCards.map((card) => (
               <article
                 key={card.title}
                 className="group flex flex-col h-full rounded-xl border border-burgundy/20 bg-parchment-light p-6 shadow-[0_2px_8px_rgba(61,13,13,0.08)] transition-all duration-300 hover:border-burgundy/50 hover:shadow-[0_8px_24px_rgba(192,40,74,0.16)] hover:-translate-y-1"
               >
-                <div className="mb-5 flex justify-center -mx-1">
-                  <div className="relative w-full max-w-[280px] aspect-[280/168] rounded-xl overflow-hidden flex items-center justify-center border border-burgundy/15 bg-parchment-deep">
-                    <Image
-                      src={card.image}
-                      alt={card.alt}
-                      fill
-                      className="object-contain"
-                      unoptimized
-                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 280px"
-                    />
-                  </div>
-                </div>
-                <h3 className="text-lg font-semibold text-burgundy-dark mb-3 leading-snug group-hover:text-burgundy transition-colors">
+                <MoscHubCardMedia
+                  src={card.image}
+                  alt={card.alt}
+                  objectPosition="top"
+                  unoptimized
+                  padded={false}
+                  outerClassName="-mx-1"
+                  frameClassName="bg-parchment-light ring-0"
+                />
+                <h3 className="text-lg font-semibold mb-3 leading-snug transition-colors">
                   {card.title}
                 </h3>
                 <p className="text-sm md:text-base text-warmGray-dark flex-1 mb-5 leading-relaxed">{card.excerpt}</p>

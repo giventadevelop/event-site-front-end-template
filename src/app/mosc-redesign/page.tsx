@@ -25,12 +25,6 @@ interface Region {
 // ─── Data ────────────────────────────────────────────────────────────────────
 const saints: Saint[] = [
 {
-  name: "St. Mary Mother of God",
-  href: "/mosc-redesign/saints/st-mary-mother-of-god",
-  image: "https://www.mosc-temp.com/mosc/assets/images/mosc_images/St_Mother_Mary.jpg",
-  alt: "Icon of St. Mary, Mother of God, in traditional Orthodox style"
-},
-{
   name: "St. Basilios Yeldho",
   href: "/mosc-redesign/saints/st-baselios-yeldho-kothamangalam-bava",
   image: "/images/saints/st-baselios-yeldho-kothamangalam-bava.jpg",
@@ -46,8 +40,14 @@ const saints: Saint[] = [
 {
   name: "St. Gregorios Of Parumala",
   href: "/mosc-redesign/saints/st-gregorios-of-parumala-metropolitan-geevarghese-mar-gregorios",
-  image: "https://www.mosc-temp.com/mosc/assets/images/mosc_images/St_Gregorios_Parumala.jpg",
+  image: "/mosc/assets/images/mosc_images/St_Gregorios_Parumala.jpg",
   alt: "Portrait of St. Gregorios of Parumala Metropolitan in episcopal robes"
+},
+{
+  name: "St. Mary Mother of God",
+  href: "/mosc-redesign/saints/st-mary-mother-of-god",
+  image: "/mosc/assets/images/mosc_images/St_Mother_Mary.jpg",
+  alt: "Icon of St. Mary, Mother of God, in traditional Orthodox style"
 }];
 
 
@@ -72,12 +72,12 @@ function formatLiturgyDisplayDate(liturgyDate: string | null): string {
 
 const slides = [
 {
-  image: "https://www.mosc-temp.com/mosc/assets/images/mosc_images/bava_thirumeni_pope_visit.jpeg",
+  image: "/mosc/assets/images/mosc_images/bava_thirumeni_pope_visit_8k.png",
   alt: "His Holiness Baselios Marthoma Mathews III meeting with Pope Francis at the Vatican"
 },
 {
-  image: "https://www.mosc-temp.com/mosc/assets/images/mosc_images/Malankara_Orthodox_Palace_Slider_New.jpeg",
-  alt: "Malankara Orthodox Palace, the headquarters of the Malankara Orthodox Syrian Church in Devalokam, Kottayam"
+  image: "/mosc/assets/images/mosc_images/Banner-image-of-Aramana-Slider_8k.png",
+  alt: "Banner image of Aramana, Malankara Orthodox Syrian Church"
 }];
 
 
@@ -143,16 +143,16 @@ export default function HomePage() {
   const visibleSaints = saints.slice(saintIndex, saintIndex + 3);
 
   return (
-    <div className="min-h-screen bg-parchment font-dm-sans flex flex-col">
+    <div className="mosc-redesign-subpage-shell syro-layout min-h-screen flex flex-col bg-parchment font-dm-sans text-warmGray-dark antialiased">
       {/*
         Sticky header must NOT sit inside overflow-x-hidden (breaks position:sticky in browsers).
         /mosc uses syro-layout + overflow only on main; we mirror that with a content wrapper.
       */}
       <MoscRedesignHeader />
 
-      <div className="flex-1 min-w-0 w-full overflow-x-hidden">
+      <main id="mainContent" className="syro-main flex-1 min-w-0 overflow-x-hidden bg-parchment">
       {/* ── HERO: mobile = contain + letterbox; md+ = cover, full-bleed panoramic ─ */}
-      <section className="relative w-full min-h-[220px] h-[min(38vh,280px)] sm:min-h-[260px] md:h-auto md:min-h-[340px] md:aspect-[5/2] md:max-h-[min(52vh,540px)] overflow-hidden bg-[#1a1410] md:bg-stone-900">
+      <section className="relative w-full min-h-[240px] h-[min(34vh,290px)] sm:min-h-[270px] md:h-auto md:min-h-[350px] md:aspect-[5/2] md:max-h-[min(42vh,490px)] overflow-hidden bg-[#1a1410] md:bg-stone-900">
         {slides.map((slide, i) =>
         <div
           key={i}
@@ -162,7 +162,6 @@ export default function HomePage() {
               src={slide.image}
               alt={slide.alt}
               fill
-              className="object-contain object-center md:object-cover md:object-center"
               priority={i === 0}
               sizes="100vw"
             />
@@ -170,32 +169,20 @@ export default function HomePage() {
         </div>
         )}
 
-        <div
-          className="absolute inset-0 z-[5] bg-gradient-to-r from-black/80 via-black/45 to-transparent pointer-events-none md:from-black/45 md:via-black/20 md:to-transparent"
-          aria-hidden
-        />
-
-        {/* Slide content overlay */}
-        <div className="relative z-10 flex min-h-[inherit] h-full items-center py-5 md:py-7">
-          <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full">
-            <div className="max-w-xl rounded-xl bg-black/55 px-4 py-3 md:px-5 md:py-4 ring-1 ring-white/25 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-[2px]">
-              <div className="w-12 h-0.5 bg-warmGold mb-3" />
-              <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold leading-snug [text-shadow:0_2px_14px_rgba(0,0,0,0.95)]">
-                Rooted in the Apostolic ministry of St. Thomas in India
-              </h1>
+        {/* Slider controls: bottom-center previous/next + themed pagination dots */}
+        <div className="absolute bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col-reverse">
+          <div className="flex items-center rounded-full px-3 py-2">
+            <div className="flex items-center gap-2">
+              {slides.map((_, i) =>
+              <button
+                key={i}
+                type="button"
+                onClick={() => setCurrentSlide(i)}
+                className={`rounded-full transition-all duration-300 ${i === currentSlide ? "w-8 h-2.5 bg-burgundy" : "w-2.5 h-2.5 bg-burgundy/35 hover:bg-burgundy/65"}`}
+                aria-label={`Go to slide ${i + 1}`} />
+              )}
             </div>
           </div>
-        </div>
-
-        {/* Pagination dots */}
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 flex gap-2">
-          {slides.map((_, i) =>
-          <button
-            key={i}
-            onClick={() => setCurrentSlide(i)}
-            className={`rounded-full transition-all duration-300 ${i === currentSlide ? "w-8 h-2.5 bg-warmGold" : "w-2.5 h-2.5 bg-white/40 hover:bg-white/70"}`}
-            aria-label={`Go to slide ${i + 1}`} />
-          )}
         </div>
       </section>
 
@@ -272,22 +259,66 @@ export default function HomePage() {
       {/* ── ABOUT US (always visible — IntersectionObserver + opacity-0 caused empty gaps) ─ */}
       <section className="py-16 md:py-24 bg-parchment border-b border-burgundy/15">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Images collage */}
-            <div className="relative h-[500px] md:h-[650px] lg:w-[125%] lg:-ml-[25%]">
-              {/* Main image: full-width/full-height card, contained so it never gets cropped */}
-              <div className="absolute inset-0 overflow-hidden transition-transform duration-500 hover:scale-[1.01]">
-                <Image
-                  src="/images/logos/MOSC-image-collage-1.png"
-                  alt="Malankara Orthodox Church fathers and bishops gathered in a formal assembly"
-                  fill
-                  className="object-contain object-left" />
-              </div>
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-14 items-center">
+            {/* Heritage narrative bento — left column on desktop */}
+            <div className="order-2 lg:order-1 about-us-heritage-mosaic">
+              <div className="about-us-mosaic-frame">
+                <figure className="about-us-mosaic-tile about-us-mosaic-tile--hero">
+                  <span className="about-us-mosaic-tile__accent">
+                    <span className="about-us-mosaic-tile__accent-dot" aria-hidden />
+                    Since AD 52
+                  </span>
+                  <div className="about-us-mosaic-tile__media">
+                    <Image
+                      src="/images/logos/About US/Chirst-Thomas-AboutUs.jpg"
+                      alt="Christ commissioning St. Thomas the Apostle"
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 42vw"
+                      className="object-cover object-center"
+                    />
+                  </div>
+                  <figcaption className="about-us-mosaic-tile__caption">
+                    <span className="about-us-mosaic-tile__label">Apostolic foundation</span>
+                    <span className="about-us-mosaic-tile__title">St. Thomas in India</span>
+                  </figcaption>
+                </figure>
 
+                <figure className="about-us-mosaic-tile about-us-mosaic-tile--bishops">
+                  <div className="about-us-mosaic-tile__media">
+                    <Image
+                      src="/images/logos/About US/Bishops-image-AboutUs.jpg"
+                      alt="Bishops gathered in church sanctuary"
+                      fill
+                      sizes="(max-width: 1024px) 50vw, 22vw"
+                      className="object-cover object-top"
+                    />
+                  </div>
+                  <figcaption className="about-us-mosaic-tile__caption">
+                    <span className="about-us-mosaic-tile__label">Living ministry</span>
+                    <span className="about-us-mosaic-tile__title">Shepherds of the faithful</span>
+                  </figcaption>
+                </figure>
+
+                <figure className="about-us-mosaic-tile about-us-mosaic-tile--cross">
+                  <div className="about-us-mosaic-tile__media">
+                    <Image
+                      src="/images/logos/About US/Cross-PlateOnly-AboutUs.png"
+                      alt="Orthodox cross on a sacred plate"
+                      fill
+                      sizes="(max-width: 1024px) 50vw, 22vw"
+                      className="object-contain object-center"
+                    />
+                  </div>
+                  <figcaption className="about-us-mosaic-tile__caption">
+                    <span className="about-us-mosaic-tile__label">Sacred tradition</span>
+                    <span className="about-us-mosaic-tile__title">Faith handed down</span>
+                  </figcaption>
+                </figure>
+              </div>
             </div>
 
-            {/* Text */}
-            <div>
+            {/* Text — right column on desktop */}
+            <div className="order-1 lg:order-2">
               <span className="inline-block text-burgundy text-xs font-bold tracking-widest uppercase mb-3 border border-burgundy/40 px-3 py-1 rounded-full bg-burgundy/10">
                 About Us
               </span>
@@ -354,7 +385,7 @@ export default function HomePage() {
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-warmBrown-dark/90 via-warmBrown-dark/20 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <p className="text-white font-semibold text-sm leading-tight">{saint.name}</p>
+                  <p className="saint-card-title font-semibold text-sm leading-tight">{saint.name}</p>
                   <span className="text-warmGold text-xs mt-1 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
                     Learn more <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </span>
@@ -384,7 +415,7 @@ export default function HomePage() {
             <div className="lg:col-span-2 flex justify-center lg:justify-start">
               <div className="w-full max-w-[320px] rounded-2xl overflow-hidden aspect-[3/4] relative shadow-xl border border-burgundy/30 hover:border-burgundy/60 transition-all duration-300 hover:shadow-burgundy/30">
                 <Image
-                  src="https://www.mosc-temp.com/mosc/assets/images/mosc_images/Baselios_Marthoma_Mathews_III.jpeg"
+                  src="/mosc/assets/images/mosc_images/Baselios_Marthoma_Mathews_III_Halo.jpg"
                   alt="His Holiness Baselios Marthoma Mathews III, Catholicos of the East and Malankara Metropolitan, in full episcopal vestments"
                   fill
                   className="object-cover" />
@@ -418,20 +449,23 @@ export default function HomePage() {
       </section>
 
       {/* ── LITURGICAL CALENDAR ────────────────────────────────────────── */}
-      <section className="py-16 md:py-24 bg-parchment border-b border-burgundy/15">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <section className="relative overflow-hidden py-16 md:py-24 bg-parchment border-b border-burgundy/15">
+        <div className="pointer-events-none absolute -top-10 -left-16 w-64 h-64 rounded-full bg-burgundy/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -right-10 w-72 h-72 rounded-full bg-warmGold/20 blur-3xl" />
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-stretch">
             {/* Calendar image */}
-            <div className="relative h-72 md:h-96 rounded-2xl overflow-hidden transition-all duration-300 group">
+            <div className="relative w-[85%] mx-auto h-72 md:h-96 lg:h-full rounded-2xl overflow-hidden transition-all duration-300 group">
               <Image
                 src="/images/logos/Liturgical-Calendar-Image.jpg"
                 alt="Malankara Orthodox Syrian Church liturgical calendar showing feast days and holy seasons"
-                fill
-                className="object-contain object-center group-hover:scale-105 transition-transform duration-500" />
+                width={1200}
+                height={900}
+                className="w-[80%] h-auto mx-auto rounded-2xl object-center shadow-xl shadow-burgundy/25 group-hover:scale-[1.04] transition-transform duration-500" />
             </div>
 
             {/* Calendar content */}
-            <div className="bg-parchment-light rounded-2xl p-8 border border-burgundy/20 shadow-sm">
+            <div className="bg-parchment-light/95 backdrop-blur-[2px] rounded-2xl p-8 border border-burgundy/25 shadow-xl shadow-burgundy/15">
               <span className="inline-block text-burgundy text-lg font-bold tracking-widest uppercase mb-3 border border-burgundy/30 px-3 py-1 rounded-full bg-burgundy/10">
                 Liturgical Calendar
               </span>
@@ -456,7 +490,7 @@ export default function HomePage() {
               </div>
 
               <div
-                className={`bg-parchment-deep rounded-xl p-5 border border-burgundy/20 ${
+                className={`bg-gradient-to-b from-parchment-deep to-parchment rounded-xl p-5 border border-burgundy/25 shadow-inner ${
                   readingLang === "malayalam" ? anekMalayalam.className : "font-dm-sans"
                 }`}
                 lang={readingLang === "malayalam" ? "ml" : "en"}
@@ -559,6 +593,12 @@ export default function HomePage() {
               {region.label}
             </button>
             )}
+            <Link
+              href="/mosc-redesign/dioceses"
+              className="px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 border border-burgundy/30 text-warmBrown hover:border-burgundy hover:text-white hover:bg-burgundy hover:shadow-md hover:shadow-burgundy/30 hover:scale-105"
+            >
+              More Locations
+            </Link>
           </div>
 
           {/* Map */}
@@ -569,8 +609,8 @@ export default function HomePage() {
         </div>
       </section>
 
+      </main>
       <MoscRedesignFooter />
-      </div>
     </div>);
 
 }

@@ -71,12 +71,23 @@ const isPublicRouteClerk = createRouteMatcher([
   '/calendar(.*)',
   '/focus-groups(.*)',
   '/pricing(.*)',
+  // Membership hub + sub-pages: call auth() in server components but do not auth.protect() here.
+  // Matches /pricing — avoids satellite RSC prefetch CORS when signInUrl points at primary domain.
+  // /membership/manage and /membership/subscribe redirect to same-origin /sign-in in page code.
+  '/membership(.*)',
 ]);
 
 // Clerk 6: default export MUST be clerkMiddleware() so auth() is detected in layout
 export default clerkMiddleware(
   async (auth, req: NextRequest) => {
     const pathname = req.nextUrl.pathname;
+    const needsCompetitionAuth = /^\/events\/[^/]+\/competitions\/(register|my-registrations)(\/|$)/.test(
+      pathname
+    );
+    if (needsCompetitionAuth) {
+      await auth.protect();
+    }
+
     const isApiRoute = pathname.startsWith('/api/');
     const isApiProxy = pathname.startsWith('/api/proxy');
     const isDiagnostic = pathname.startsWith('/api/diagnostic');
@@ -144,9 +155,16 @@ export default clerkMiddleware(
   },
   {
     ...satConfig,
-    // NOTE: frontendApiProxy REMOVED. The CNAME clerk.event-site-manager.com is verified
-    // and points to frontend-api.clerk.services, so Clerk reaches its FAPI directly.
-    // The proxy was causing auth failures (couldn't register in Clerk Dashboard).
+    // NOTE: frontendApiProxy intentionally NOT enabled. Enabling it routes Clerk's
+    // satellite handshake through /__clerk/* on this domain, which requires the
+    // proxy URL to be registered against the Clerk instance in the Dashboard.
+    // That registration validation fails (host_invalid) — the chicken-and-egg
+    // documented in the original comment — so the proxied handshake never works.
+    // Instead, rely on Clerk's URL-handshake flow: clerk.redirectToSignIn() in the
+    // satellite's sign-in page sends the browser to the primary, which signs the
+    // user in and redirects back with __clerk_handshake=<token> in the URL. The
+    // satellite SDK reads that token and establishes a first-party session cookie
+    // — no proxy or Dashboard registration required.
     signInUrl: process.env.NEXT_PUBLIC_APP_URL?.includes('amplifyapp.com') || process.env.NEXT_PUBLIC_APP_URL?.includes('mosc-temp.com')
       ? `https://${process.env.NEXT_PUBLIC_PRIMARY_DOMAIN || 'www.event-site-manager.com'}/sign-in`
       : '/sign-in',
@@ -155,9 +173,13 @@ export default clerkMiddleware(
 
 export const config = {
   matcher: [
-    // Skip Next.js internals, static files, AND /__clerk
-    // __clerk excluded — using CNAME (clerk.event-site-manager.com) directly, no proxy needed.
-    '/((?!_next|__clerk|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Skip Next.js internals, static files, AND /__clerk.
+    // __clerk is excluded because frontendApiProxy is not enabled — we don't want
+    // Clerk middleware to intercept /__clerk/* on this domain. The satellite uses
+    // the URL-handshake flow (browser redirects with __clerk_handshake token),
+    // not the proxy flow.
+    // Include video/audio (mp4, webm, …) — otherwise Clerk runs on /images/.../*.mp4 and auth.protect() returns 404 HTML instead of the file.
+    '/((?!_next|__clerk|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm|mov|m4v|ogg|mp3|wav|aac|opus|pdf|map)).*)',
     '/(api|trpc)(.*)',
   ],
 };

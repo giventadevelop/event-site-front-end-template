@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, ChevronDown, X, LogOut, User } from 'lucide-react';
@@ -81,6 +81,8 @@ const adminSubmenuItems = [
   { name: 'Bulk Email', href: '/admin/bulk-email' },
   { name: 'Test Stripe', href: '/admin/test-stripe' },
   { name: 'Media Management', href: '/admin/media' },
+  { name: 'Official Documents', href: '/admin/official-documents' },
+  { name: 'Document Categories', href: '/admin/official-document-categories' },
   { name: 'Executive Committee', href: '/admin/executive-committee' },
   { name: 'Event Sponsors', href: '/admin/event-sponsors' }
 ];
@@ -135,7 +137,7 @@ const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string
   window.history.pushState(null, '', hashPart);
 
   // Wait for element to exist before scrolling (especially important for dynamically loaded sections)
-  const headerHeight = 80;
+  const headerHeight = 128;
   const maxWaitTime = 10000; // 10 seconds max wait
   const pollInterval = 100; // Check every 100ms
   const startTime = Date.now();
@@ -265,6 +267,243 @@ const hideNavigationLoading = () => {
     loadingIndicator = null;
   }
 };
+
+type NavSubItem = {
+  name: string;
+  href: string;
+  requiresAuth?: boolean;
+};
+
+/** True only after mount — use to defer client-only auth/settings/nav state */
+function useMounted(): boolean {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  return mounted;
+}
+
+/** Hash fragment for active nav — empty until after mount to avoid SSR/client mismatch */
+function useLocationHash(): string {
+  const [hash, setHash] = useState('');
+  useEffect(() => {
+    const update = () => setHash(window.location.hash);
+    update();
+    window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  }, []);
+  return hash;
+}
+
+function pathnameMatchesMosc(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === '/mosc' || pathname.startsWith('/mosc/');
+}
+
+function pathnameMatchesMoscRedesign(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === '/mosc-redesign' || pathname.startsWith('/mosc-redesign/');
+}
+
+/** SSR + first paint: hide auth/membership items (matches server Clerk/settings state) */
+function shouldShowNavSubItem(
+  subItem: NavSubItem,
+  mounted: boolean,
+  userId: string | null | undefined,
+  settings: { isMembershipSubscriptionEnabled?: boolean } | null
+): boolean {
+  if (!mounted) {
+    if (subItem.requiresAuth) return false;
+    if (subItem.href === '/membership') return false;
+    return true;
+  }
+  if (subItem.requiresAuth && !userId) return false;
+  if (subItem.href === '/membership' && !settings?.isMembershipSubscriptionEnabled) return false;
+  return true;
+}
+
+/**
+ * Desktop nav item with submenu (About, Features) — hover + click, click-outside close
+ */
+function HeaderNavDropdown({
+  item,
+  userId,
+  settings,
+  pathname,
+  handleSmoothScroll,
+}: {
+  item: { name: string; dropdown: NavSubItem[] };
+  userId: string | null | undefined;
+  settings: { isMembershipSubscriptionEnabled?: boolean } | null;
+  pathname: string | null;
+  handleSmoothScroll: (e: React.MouseEvent, href: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useMounted();
+  const locationHash = useLocationHash();
+
+  const updateMenuPosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 8, left: rect.left });
+  }, []);
+
+  const clearCloseHoverTimeout = useCallback(() => {
+    if (closeHoverTimeoutRef.current) {
+      clearTimeout(closeHoverTimeoutRef.current);
+      closeHoverTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleCloseOnHoverLeave = useCallback(() => {
+    clearCloseHoverTimeout();
+    closeHoverTimeoutRef.current = setTimeout(() => setIsOpen(false), 200);
+  }, [clearCloseHoverTimeout]);
+
+  const openMenu = useCallback(() => {
+    clearCloseHoverTimeout();
+    setIsOpen(true);
+  }, [clearCloseHoverTimeout]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      setIsOpen(false);
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMenuPosition(null);
+      return;
+    }
+    updateMenuPosition();
+    window.addEventListener('scroll', updateMenuPosition, true);
+    window.addEventListener('resize', updateMenuPosition);
+    return () => {
+      window.removeEventListener('scroll', updateMenuPosition, true);
+      window.removeEventListener('resize', updateMenuPosition);
+    };
+  }, [isOpen, updateMenuPosition]);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
+
+  useEffect(() => () => clearCloseHoverTimeout(), [clearCloseHoverTimeout]);
+
+  const isAboutActive =
+    item.name === 'About' &&
+    item.dropdown.some(
+      (subItem) =>
+        subItem.href === pathname ||
+        (subItem.href === '/#about-us' && pathname === '/' && locationHash === '#about-us') ||
+        (subItem.href === '/team' && pathname === '/team') ||
+        (subItem.href === '/sponsors' && pathname === '/sponsors')
+    );
+
+  const isFeaturesActive =
+    item.name === 'Features' &&
+    item.dropdown.some(
+      (subItem) =>
+        subItem.href === pathname ||
+        (subItem.href === '/profile' && pathname === '/profile') ||
+        (subItem.href === '/membership' && pathname?.startsWith('/membership')) ||
+        (subItem.href === '/mosc' && pathnameMatchesMosc(pathname)) ||
+        (subItem.href === '/mosc-redesign' && pathnameMatchesMoscRedesign(pathname))
+    );
+
+  const isActive =
+    mounted &&
+    ((item.name === 'About' && isAboutActive) || (item.name === 'Features' && isFeaturesActive));
+
+  return (
+    <div
+      ref={containerRef}
+      className="header-nav-dropdown-root relative group"
+      onMouseEnter={openMenu}
+      onMouseLeave={scheduleCloseOnHoverLeave}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => {
+          clearCloseHoverTimeout();
+          setIsOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              requestAnimationFrame(() => updateMenuPosition());
+            }
+            return next;
+          });
+        }}
+        className={`header-nav-link font-semibold flex items-center gap-1.5 cursor-pointer ${isActive ? 'active' : ''}`}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+      >
+        <span>{item.name}</span>
+        <ChevronDown
+          size={16}
+          className={`header-chevron text-[var(--header-text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+      {isOpen && menuPosition && (
+      <div
+        className="header-dropdown header-dropdown--fixed visible w-56"
+        style={{ top: menuPosition.top, left: menuPosition.left }}
+        role="menu"
+        aria-label={`${item.name} submenu`}
+        onMouseEnter={openMenu}
+        onMouseLeave={scheduleCloseOnHoverLeave}
+      >
+        <div className="py-2">
+          {item.dropdown.map((subItem) => {
+            if (!shouldShowNavSubItem(subItem, mounted, userId, settings)) return null;
+
+            const isSubItemActive =
+              mounted &&
+              (subItem.href === pathname ||
+                (subItem.href === '/membership' && pathname?.startsWith('/membership')) ||
+                (subItem.href === '/mosc' && pathnameMatchesMosc(pathname)) ||
+                (subItem.href === '/mosc-redesign' && pathnameMatchesMoscRedesign(pathname)) ||
+                (subItem.href === '/#about-us' && pathname === '/' && locationHash === '#about-us') ||
+                (subItem.href === '/team' && pathname === '/team'));
+
+            return (
+              <Link
+                key={subItem.name}
+                href={subItem.href}
+                prefetch={subItem.href === '/mosc' || subItem.href === '/mosc-redesign' ? false : undefined}
+                onClick={(e) => {
+                  if (subItem.href.startsWith('/#')) {
+                    handleSmoothScroll(e, subItem.href);
+                  }
+                  setIsOpen(false);
+                }}
+                className={`header-dropdown-item font-semibold block ${isSubItemActive ? 'active' : ''}`}
+                role="menuitem"
+                aria-label={`Navigate to ${subItem.name}`}
+              >
+                {subItem.name}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * User Avatar Dropdown Component
@@ -419,7 +658,9 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [openMobileDropdowns, setOpenMobileDropdowns] = useState<Record<string, boolean>>({});
-
+  const [headerScrolled, setHeaderScrolled] = useState(false);
+  const mounted = useMounted();
+  const locationHash = useLocationHash();
   // CRITICAL: Check for sign-out flag and call signOut() on satellite domain.
   // Just clearing localStorage is NOT enough — Clerk stores session in HTTP-only cookies
   // that can only be cleared via signOut(). Without this, the avatar/admin menu persist.
@@ -469,6 +710,22 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
 
     performSignOut();
   }, [pendingSignOut, isLoaded, signOut]);
+
+  const isHomePage =
+    pathname === '/' || pathname === '/charity-theme';
+
+  // Frosted header when content scrolls under the sticky bar (homepage + all pages)
+  useEffect(() => {
+    const SCROLL_THRESHOLD = 24;
+
+    const updateScrollState = () => {
+      setHeaderScrolled(window.scrollY > SCROLL_THRESHOLD);
+    };
+
+    updateScrollState();
+    window.addEventListener('scroll', updateScrollState, { passive: true });
+    return () => window.removeEventListener('scroll', updateScrollState);
+  }, [pathname]);
 
   // Debug: Log auth state changes
   useEffect(() => {
@@ -529,13 +786,17 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
             profile = data[0];
           } else if (data?.content && Array.isArray(data.content)) {
             profile = data.content[0];
-          } else {
+          } else if (data && typeof data === 'object' && 'userId' in data) {
             profile = data;
           }
           const role = profile?.userRole ?? 'NONE';
-          const adminResult = isAdminRole(profile?.userRole);
-          console.log(`[Header] Profile API response: userRole="${role}", isAdmin=${adminResult}, profileUserId=${profile?.userId}, dataType=${Array.isArray(data) ? 'array' : typeof data}, dataKeys=${data ? Object.keys(data).join(',') : 'null'}, attempt=${attempt}`);
-          if (!cancelled) setIsAdmin(adminResult);
+          const adminResult = profile
+            ? isAdminRole(profile.userRole)
+            : isTenantAdmin === true;
+          console.log(`[Header] Profile API response: profileId=${profile?.id ?? 'none'}, userRole="${role}", userStatus="${profile?.userStatus ?? 'none'}", isAdmin=${adminResult}, profileUserId=${profile?.userId}, dataType=${Array.isArray(data) ? 'array' : typeof data}, count=${Array.isArray(data) ? data.length : data?.content?.length ?? 1}, attempt=${attempt}`);
+          if (!cancelled) {
+            setIsAdmin(adminResult);
+          }
         } else {
           console.warn(`[Header] Admin status check failed (attempt ${attempt}):`, resp.status);
 
@@ -603,6 +864,15 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileMenuOpen]);
+
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
@@ -660,7 +930,7 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const headerHeight = 80;
+    const headerHeight = 128;
 
     const scrollToHashWithOffset = (behavior: ScrollBehavior = 'smooth') => {
       const hash = window.location.hash;
@@ -746,15 +1016,11 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
   }, [pathname]);
 
   // Build About dropdown dynamically based on tenant settings
-  // Only show Team when settings are loaded AND showTeamSection is explicitly true
+  // Only show Team when settings are loaded AND showTeamSection is explicitly true.
   const aboutDropdown = [
     { name: 'About Us', href: '/#about-us' }
   ];
-  // Only add Team if:
-  // 1. Settings are loaded (not loading)
-  // 2. Settings exist (not null)
-  // 3. showTeamSection is explicitly true
-  if (!settingsLoading && settings && showTeamSection) {
+  if (mounted && !settingsLoading && settings && showTeamSection) {
     aboutDropdown.push({ name: 'Team', href: '/team' });
   }
   // Always add Sponsors menu item
@@ -780,115 +1046,55 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 header-glass">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-[4.5rem]">
-            {/* Left side - Unite India Text Logo with Editorial Typography */}
-            <div className="flex items-center h-full">
-              <Link href="/" className="group flex items-center gap-3 h-full">
-                {/* Unite India logo icon - full header height, 102px wide */}
-                <div className="flex items-center justify-center h-full w-[102px] min-w-[102px] rounded-xl flex-shrink-0 overflow-hidden transition-all duration-300 group-hover:scale-105">
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 header-glass${headerScrolled ? ' header-glass--scrolled' : ''}${isHomePage ? ' header-glass--home' : ''}`}
+      >
+        <div className="w-full max-w-[90rem] mx-auto px-4 sm:px-6 lg:pl-5 lg:pr-8 xl:px-10">
+          <div className="header-inner-grid h-[8rem] w-full min-w-0 items-center gap-2 sm:gap-3 lg:gap-3 xl:gap-4">
+            {/* Brand — logo + MALAYALEES.US on all breakpoints (incl. mobile) */}
+            <div className="header-brand-col flex min-w-0 items-center h-full max-w-[calc(100%-5.75rem)] sm:max-w-[calc(100%-6.25rem)] lg:max-w-none">
+              <Link href="/" className="group flex min-w-0 items-center gap-2 sm:gap-2.5 lg:gap-2 xl:gap-3 h-full">
+                <div className="header-logo-image-wrap flex h-full w-[5.75rem] min-w-[5.75rem] sm:w-[6.75rem] sm:min-w-[6.75rem] lg:w-[6.5rem] lg:min-w-[6.5rem] xl:w-[7.5rem] xl:min-w-[7.5rem] 2xl:w-[9rem] 2xl:min-w-[9rem] flex-shrink-0 items-center justify-center overflow-hidden rounded-xl transition-all duration-300 group-hover:scale-105">
                   <Image
                     src="/images/logos/Malayalees_US/Malayalees_US_Header_Branding.png"
                     alt="Unite India"
-                    width={102}
-                    height={72}
-                    className="w-full h-full object-contain"
+                    width={168}
+                    height={128}
+                    priority
+                    loading="eager"
+                    className="h-full w-full object-contain object-center"
+                    style={{ width: 'auto', height: '100%' }}
                   />
                 </div>
-                <div className="text-left">
-                  <div className="header-logo-brand text-[1.375rem] leading-tight inline-block">
+                <div className="min-w-0 shrink text-left">
+                  <div className="header-logo-brand truncate whitespace-nowrap text-base leading-tight sm:text-lg md:text-xl lg:text-base xl:text-lg 2xl:text-[1.5rem]">
                     MALAYALEES.US
                   </div>
                 </div>
               </Link>
             </div>
 
-            {/* Center - Desktop Navigation */}
-            <div className="hidden lg:flex items-center gap-1 ml-6">
-              {/* Navigation Menu Items */}
+            {/* Main nav (desktop) — middle grid column; scrolls horizontally without overlapping auth */}
+            <div className="header-main-nav-wrap hidden min-w-0 items-center justify-center px-0.5 lg:flex">
               {!hideMenuItems && (
-                <nav className="flex items-center gap-0.5" role="navigation" aria-label="Main navigation">
+                <nav
+                  className="header-main-nav mx-auto flex min-w-0 max-w-full flex-nowrap items-center justify-center gap-0.5 lg:gap-0.5 xl:gap-1 2xl:gap-2"
+                  role="navigation"
+                  aria-label="Main navigation"
+                >
                   {updatedNavItems.map((item) => {
                     const hasDropdown = item.dropdown && Array.isArray(item.dropdown) && item.dropdown.length > 0;
-                    const isAboutActive = hasDropdown && item.name === 'About' && item.dropdown.some(
-                      (subItem: any) => subItem.href === pathname ||
-                        (subItem.href === '/#about-us' && typeof window !== 'undefined' && window.location.hash === '#about-us') ||
-                        (subItem.href === '/team' && pathname === '/team') ||
-                        (subItem.href === '/sponsors' && pathname === '/sponsors')
-                    );
-                    const isFeaturesActive = hasDropdown && item.name === 'Features' && item.dropdown.some(
-                      (subItem: any) => subItem.href === pathname ||
-                        (subItem.href === '/profile' && pathname === '/profile') ||
-                        (subItem.href === '/membership' && pathname?.startsWith('/membership')) ||
-                        (subItem.href === '/mosc' && pathname?.startsWith('/mosc')) ||
-                        (subItem.href === '/mosc-redesign' && pathname?.startsWith('/mosc-redesign'))
-                    );
 
                     return (
-                      <div key={item.name} className="relative group">
+                      <div key={item.name} className="relative shrink-0">
                         {hasDropdown ? (
-                          <>
-                            <div
-                              className={`header-nav-link font-semibold flex items-center gap-1.5 cursor-pointer ${(item.name === 'About' && isAboutActive) || (item.name === 'Features' && isFeaturesActive)
-                                  ? 'active'
-                                  : ''
-                                }`}
-                              aria-haspopup="true"
-                              aria-expanded="false"
-                              role="button"
-                              tabIndex={0}
-                            >
-                              <span>{item.name}</span>
-                              <ChevronDown
-                                size={14}
-                                className="header-chevron text-[var(--header-text-muted)]"
-                                aria-hidden="true"
-                              />
-                            </div>
-                            {/* Dropdown Menu */}
-                            <div
-                              className="header-dropdown absolute top-full left-0 mt-2 w-56 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 z-50"
-                              role="menu"
-                              aria-label={`${item.name} submenu`}
-                            >
-                              <div className="py-2">
-                                {item.dropdown.map((subItem: any) => {
-                                  // Skip Profile if user is not authenticated
-                                  if (subItem.requiresAuth && !userId) return null;
-
-                                  // Skip Membership if membership subscription is not enabled
-                                  if (subItem.href === '/membership' && !settings?.isMembershipSubscriptionEnabled) return null;
-
-                                  const isSubItemActive = subItem.href === pathname ||
-                                    (subItem.href === '/membership' && pathname?.startsWith('/membership')) ||
-                                    (subItem.href === '/mosc' && pathname?.startsWith('/mosc')) ||
-                                    (subItem.href === '/mosc-redesign' && pathname?.startsWith('/mosc-redesign')) ||
-                                    (subItem.href === '/#about-us' && typeof window !== 'undefined' && window.location.hash === '#about-us') ||
-                                    (subItem.href === '/team' && pathname === '/team');
-
-                                  return (
-                                    <Link
-                                      key={subItem.name}
-                                      href={subItem.href}
-                                      prefetch={subItem.href === '/mosc' || subItem.href === '/mosc-redesign' ? false : undefined}
-                                      onClick={(e) => {
-                                        // Handle smooth scroll for hash links
-                                        if (subItem.href.startsWith('/#')) {
-                                          handleSmoothScroll(e, subItem.href);
-                                        }
-                                      }}
-                                      className={`header-dropdown-item font-semibold block ${isSubItemActive ? 'active' : ''}`}
-                                      role="menuitem"
-                                      aria-label={`Navigate to ${subItem.name}`}
-                                    >
-                                      {subItem.name}
-                                    </Link>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </>
+                          <HeaderNavDropdown
+                            item={{ name: item.name, dropdown: item.dropdown }}
+                            userId={userId}
+                            settings={settings}
+                            pathname={pathname}
+                            handleSmoothScroll={handleSmoothScroll}
+                          />
                         ) : (
                           <Link
                             href={item.href}
@@ -905,42 +1111,42 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
                   })}
                 </nav>
               )}
+            </div>
 
-              {/* Auth and Admin Menu Items */}
-              <div className="flex items-center gap-2 ml-2">
-                {!userId ? (
+            {/* Right — auth, search, mobile menu (dedicated grid column — never overlaps nav) */}
+            <div className="header-auth-cluster flex shrink-0 flex-nowrap items-center justify-end gap-1.5 sm:gap-2 lg:gap-2.5">
+              <div className="header-auth-actions hidden lg:flex shrink-0 flex-nowrap items-center gap-1.5 xl:gap-2">
+                {!isLoaded ? null : !userId ? (
                   <>
                     <Link
                       href="/sign-in"
-                      className="header-nav-link font-semibold"
+                      className="header-nav-link header-auth-link font-semibold whitespace-nowrap shrink-0"
                     >
                       <span>Sign In</span>
                     </Link>
                     <Link
                       href="/sign-up"
-                      className="header-cta"
+                      className="header-cta whitespace-nowrap shrink-0"
                     >
                       <span>Sign up</span>
                     </Link>
                   </>
                 ) : (
                   <>
-                    {/* Admin Menu with Submenu */}
                     {isAdmin && (
-                      <div className="relative group">
+                      <div className="relative group shrink-0">
                         <Link
                           href="/admin"
-                          className={`header-nav-link font-semibold flex items-center gap-1.5 ${pathname?.startsWith("/admin") ? 'active' : ''}`}
+                          className={`header-nav-link header-auth-link font-semibold flex shrink-0 items-center gap-1.5 whitespace-nowrap ${pathname?.startsWith("/admin") ? 'active' : ''}`}
                         >
                           <span>Admin</span>
                           <ChevronDown
-                            size={14}
+                            size={16}
                             className="header-chevron text-[var(--header-text-muted)]"
                             aria-hidden="true"
                           />
                         </Link>
 
-                        {/* Admin Submenu */}
                         <div className="header-dropdown absolute top-full right-0 mt-2 w-64 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 z-50 max-h-[70vh] overflow-y-auto">
                           <div className="py-2">
                             {adminSubmenuItems.map(subItem => {
@@ -962,7 +1168,6 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
                                         aria-hidden="true"
                                       />
                                     </div>
-                                    {/* Membership Submenu */}
                                     <div className="header-dropdown absolute top-0 left-full ml-2 w-48 group-hover/membership:visible group-hover/membership:opacity-100 group-hover/membership:translate-y-0 group-hover/membership:scale-100 z-50">
                                       <div className="py-2">
                                         {subItem.dropdown.map((subSubItem: any) => {
@@ -1002,23 +1207,20 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
                       </div>
                     )}
 
-                    {/* User Profile Avatar Dropdown - Rightmost */}
-                    <UserAvatarDropdown
-                      user={user}
-                      onSignOut={handleSignOut}
-                      isSigningOut={isSigningOut}
-                    />
+                    <div className="shrink-0">
+                      <UserAvatarDropdown
+                        user={user}
+                        onSignOut={handleSignOut}
+                        isSigningOut={isSigningOut}
+                      />
+                    </div>
                   </>
                 )}
               </div>
-            </div>
-
-            {/* Right side - Search and Mobile Menu */}
-            <div className="flex items-center gap-2">
               {/* Search Button */}
               <button
                 aria-label="Search"
-                className="header-search-btn hidden sm:flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)]"
+                className="header-search-btn hidden shrink-0 sm:flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)]"
               >
                 <Search
                   size={18}
@@ -1029,7 +1231,7 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
 
               {/* Mobile menu button */}
               <button
-                className="header-hamburger lg:hidden focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)]"
+                className="header-hamburger shrink-0 lg:hidden focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)]"
                 onClick={toggleMobileMenu}
                 aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
                 aria-expanded={isMobileMenuOpen}
@@ -1054,57 +1256,54 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-[var(--header-text-primary)]/20 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 z-[55] bg-[var(--header-text-primary)]/30 backdrop-blur-sm lg:hidden"
           onClick={closeMobileMenu}
+          aria-hidden="true"
         />
       )}
 
-      {/* Mobile Menu Sidebar */}
+      {/* Mobile Menu — full viewport width so nothing is clipped off-screen */}
       <div
         id="mobile-menu"
-        className={`header-mobile-menu fixed top-0 right-0 h-full w-80 max-w-[85vw] z-50 transform transition-transform duration-300 ease-out lg:hidden ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`header-mobile-menu fixed inset-y-0 right-0 left-0 z-[60] flex h-[100dvh] max-h-[100dvh] w-full max-w-[100vw] transform transition-transform duration-300 ease-out lg:hidden ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         aria-hidden={!isMobileMenuOpen}
       >
-        <div className="flex flex-col h-full">
-          {/* Mobile Menu Header */}
-          <div className="flex items-center justify-between p-5 border-b border-[var(--header-border)]">
-            <Link href="/" className="group flex items-center gap-2.5" onClick={closeMobileMenu}>
-              <div className="flex items-center justify-center w-[86px] min-w-[86px] h-14 rounded-lg flex-shrink-0 overflow-hidden">
+        <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden">
+          {/* Mobile Menu Header — compact row; close always visible */}
+          <div className="flex shrink-0 items-center gap-3 border-b border-[var(--header-border)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <Link
+              href="/"
+              className="group flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+              onClick={closeMobileMenu}
+            >
+              <div className="header-logo-image-wrap flex h-12 w-12 min-w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg sm:h-14 sm:w-14 sm:min-w-14">
                 <Image
                   src="/images/logos/Malayalees_US/Malayalees_US_Header_Branding.png"
                   alt="Unite India"
-                  width={86}
+                  width={56}
                   height={56}
-                  className="w-full h-full object-contain"
+                  className="h-full w-full object-contain"
                 />
               </div>
-              <div className="text-left">
-                <div className="header-logo-brand text-lg leading-tight inline-block">
+              <div className="min-w-0 text-left">
+                <div className="header-logo-brand truncate text-base leading-tight sm:text-lg">
                   MALAYALEES.US
                 </div>
               </div>
             </Link>
             <button
               onClick={closeMobileMenu}
-              className="
-                flex items-center justify-center
-                w-10 h-10
-                text-[var(--header-text-muted)] hover:text-[var(--header-accent-primary)]
-                bg-transparent hover:bg-[var(--header-hover-bg)]
-                rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)]
-                transition-all duration-200
-                touch-manipulation
-              "
+              className="header-mobile-menu-close flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--header-border)] bg-[var(--header-hover-bg)] text-[var(--header-text-primary)] hover:bg-[var(--header-active-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)] transition-all duration-200 touch-manipulation"
               aria-label="Close navigation menu"
+              type="button"
             >
-              <X size={20} strokeWidth={2} aria-hidden="true" />
+              <X size={22} strokeWidth={2.5} aria-hidden="true" />
             </button>
           </div>
 
           {/* Mobile Menu Navigation */}
-          <nav className="flex-1 overflow-y-auto py-4" role="navigation" aria-label="Mobile navigation">
+          <nav className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto py-4 pb-[max(1rem,env(safe-area-inset-bottom))]" role="navigation" aria-label="Mobile navigation">
             <ul className="space-y-0.5 px-3">
               {!hideMenuItems && updatedNavItems.map((item) => {
                 const hasDropdown = item.dropdown && Array.isArray(item.dropdown) && item.dropdown.length > 0;
@@ -1128,20 +1327,18 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
                       </button>
                       {isDropdownOpen && (
                         <ul className="pl-3 mt-1 space-y-0.5 border-l-2 border-[var(--header-border)] ml-4">
-                          {item.dropdown.map((subItem: any) => {
-                            // Skip Profile if user is not authenticated
-                            if (subItem.requiresAuth && !userId) return null;
+                          {item.dropdown.map((subItem: NavSubItem) => {
+                            if (!shouldShowNavSubItem(subItem, mounted, userId, settings)) return null;
 
-                            // Skip Membership if membership subscription is not enabled
-                            if (subItem.href === '/membership' && !settings?.isMembershipSubscriptionEnabled) return null;
-
-                            const isSubItemActive = subItem.href === pathname ||
-                              (subItem.href === '/membership' && pathname?.startsWith('/membership')) ||
-                              (subItem.href === '/mosc' && pathname?.startsWith('/mosc')) ||
-                              (subItem.href === '/mosc-redesign' && pathname?.startsWith('/mosc-redesign')) ||
-                              (subItem.href === '/#about-us' && typeof window !== 'undefined' && window.location.hash === '#about-us') ||
-                              (subItem.href === '/team' && pathname === '/team') ||
-                              (subItem.href === '/sponsors' && pathname === '/sponsors');
+                            const isSubItemActive =
+                              mounted &&
+                              (subItem.href === pathname ||
+                                (subItem.href === '/membership' && pathname?.startsWith('/membership')) ||
+                                (subItem.href === '/mosc' && pathnameMatchesMosc(pathname)) ||
+                                (subItem.href === '/mosc-redesign' && pathnameMatchesMoscRedesign(pathname)) ||
+                                (subItem.href === '/#about-us' && pathname === '/' && locationHash === '#about-us') ||
+                                (subItem.href === '/team' && pathname === '/team') ||
+                                (subItem.href === '/sponsors' && pathname === '/sponsors'));
 
                             return (
                               <li key={subItem.name}>
@@ -1198,7 +1395,7 @@ export default function Header({ hideMenuItems = false, variant = 'charity', isT
 
             {/* Mobile Menu Auth Section */}
             <div className="px-3 mt-6 space-y-2">
-              {!userId ? (
+              {!isLoaded ? null : !userId ? (
                 <div className="space-y-2 p-3 rounded-xl bg-gradient-to-br from-violet-50 to-amber-50 border border-[var(--header-border)]">
                   <Link
                     href="/sign-in"

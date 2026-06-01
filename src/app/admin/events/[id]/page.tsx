@@ -17,7 +17,8 @@ import {
   FaClock,
   FaMapMarkerAlt,
   FaTicketAlt,
-  FaObjectGroup
+  FaObjectGroup,
+  FaTrophy
 } from 'react-icons/fa';
 import type { EventDetailsDTO } from '@/types';
 
@@ -94,10 +95,14 @@ export default function EventOverviewPage() {
         <div className="flex items-center">
           <Link
             href="/admin/manage-events"
-            className="flex items-center text-blue-600 hover:text-blue-800 mr-4"
+            className="flex-shrink-0 h-14 rounded-xl bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 px-5 mr-4"
+            title="Back to Manage Events"
+            aria-label="Back to Manage Events"
           >
-            <FaArrowLeft className="mr-2" />
-            Back to Manage Events
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-200 flex items-center justify-center">
+              <FaArrowLeft className="w-6 h-6 text-indigo-600" />
+            </div>
+            <span className="font-semibold text-indigo-700">Back to Manage Events</span>
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -110,7 +115,7 @@ export default function EventOverviewPage() {
         {event && (
           <Link
             href={`/admin/events/${eventId}/edit`}
-            className="w-full flex-shrink-0 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105"
+            className="ml-auto w-auto flex-shrink-0 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 px-6"
             title="Edit Event"
             aria-label="Edit Event"
           >
@@ -239,6 +244,20 @@ export default function EventOverviewPage() {
                 </div>
                 <span className="font-semibold text-center leading-tight">Focus Groups</span>
               </Link>
+
+              {event.isCompetitionEvent && (
+                <Link
+                  href={`/admin/events/${eventId}/competitions/settings`}
+                  className="flex flex-col items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-lg shadow-md p-4 text-xs transition-all group"
+                  title="Competitions"
+                  aria-label="Competitions"
+                >
+                  <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-rose-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                    <FaTrophy className="w-10 h-10 text-rose-500" />
+                  </div>
+                  <span className="font-semibold text-center leading-tight">Competitions</span>
+                </Link>
+              )}
 
               <Link
                 href={`/admin/events/${eventId}/ticket-types/list`}

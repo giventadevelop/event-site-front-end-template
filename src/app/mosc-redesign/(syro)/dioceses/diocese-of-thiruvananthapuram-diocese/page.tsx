@@ -25,7 +25,7 @@ const dioceseofthiruvananthapuramdiocesePage = () => {
                 {/* Featured Image - centered, contained (administration style) */}
                 <div className="mb-8 flex justify-center">
                   <Image
-                    src="/images/dioceses/diocese-of-thiruvananthapuram-diocese.jpg"
+                    src="/images/dioceses/diocese-of-thiruvananthapuram-diocese.png"
                     alt="Diocese of Thiruvananthapuram"
                     width={175} height={175}
                     className="rounded-lg object-contain" style={{ width: '175px', height: '175px' }}
@@ -72,20 +72,22 @@ const dioceseofthiruvananthapuramdiocesePage = () => {
                       <p className="mb-1">
                         <span className="font-semibold">Office:</span>
                         <br />
-                        Sreyas Aramana, Mar Epiphanios Centre,
+                        Orthodox Church Centre,
                         <br />
-                        Kannamcode, Adoor - 691 523.
+                        Ulloor, Medical College P.O.,
+                        <br />
+                        Thiruvananthapuram - 695 011
                       </p>
                       <p>
-                        <span className="font-semibold">Phone:</span> 04734 227117, 227271
+                        <span className="font-semibold">Phone:</span> 0475-2273493, Mob: 9447479843
                       </p>
                       <p>
                         <span className="font-semibold">E-mail:</span>{' '}
-                        <a href="mailto:akdiocese@gmail.com" className="text-syro-red hover:underline font-medium">akdiocese@gmail.com</a>
+                        <a href="mailto:moctvm@gmail.com" className="text-syro-red hover:underline font-medium">moctvm@gmail.com</a>
                       </p>
                       <p>
                         <a
-                          href="https://share.google/znjgX8wo7d6N676rM"
+                          href="https://maps.app.goo.gl/jvwpJfnDtDFYoxuq6"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="syro-primary-button inline-flex items-center gap-2 w-fit"

@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { HomeSectionRail } from '@/components/HomeSectionRail';
+import { HomeSectionTitle } from '@/components/HomeSectionTitle';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ExecutiveCommitteeTeamMemberDTO } from '@/types';
-import { getAppUrl } from '@/lib/env';
 import { useDeferredFetch } from '@/hooks/usePageReady';
+import { parseExecutiveCommitteeTeamMembersResponse } from '@/lib/parseExecutiveCommitteeTeamMembersResponse';
 import { getHomepageCacheKey } from '@/lib/homepageCacheKeys';
 import Modal from '@/components/ui/Modal';
 import styles from './TeamSection.module.css';
@@ -37,7 +39,7 @@ const TeamSection: React.FC = () => {
       if (cachedData) {
         const { data, timestamp } = JSON.parse(cachedData);
         if (Date.now() - timestamp < CACHE_DURATION) {
-          setTeamMembers(data);
+          setTeamMembers(parseExecutiveCommitteeTeamMembersResponse(data));
           setLoading(false);
           setShowImages(true);
         }
@@ -54,7 +56,7 @@ const TeamSection: React.FC = () => {
           const { data, timestamp } = JSON.parse(cachedData);
           if (Date.now() - timestamp < CACHE_DURATION) {
             console.log('✅ Using cached team data');
-            setTeamMembers(data);
+            setTeamMembers(parseExecutiveCommitteeTeamMembersResponse(data));
             setLoading(false);
             setShowImages(true); // Show images immediately for cached data
             return;
@@ -68,10 +70,9 @@ const TeamSection: React.FC = () => {
       if (!shouldFetch) return;
 
       try {
-        const baseUrl = getAppUrl();
-        // Proxy injects tenantId.equals per nextjs_api_routes.mdc; only pass filter/sort here
+        // Same-origin relative URL (avoids localhost vs 127.0.0.1 / port mismatch)
         const response = await fetch(
-          `${baseUrl}/api/proxy/executive-committee-team-members?isActive.equals=true&sort=priorityOrder,asc`,
+          '/api/proxy/executive-committee-team-members?isActive.equals=true&sort=priorityOrder,asc',
           {
             method: 'GET',
             headers: {
@@ -89,7 +90,7 @@ const TeamSection: React.FC = () => {
         }
 
         const data = await response.json();
-        const teamMembersList = Array.isArray(data) ? data : [];
+        const teamMembersList = parseExecutiveCommitteeTeamMembersResponse(data);
 
         // Cache the data
         try {
@@ -146,10 +147,8 @@ const TeamSection: React.FC = () => {
   };
 
   /**
-   * Chunk team members by priority for layout:
-   * - Row 1: only the first (priority 0 / rank 1) - single card, one item
-   * - Row 2+: 3 per row (2nd, 3rd, 4th then 5th, 6th, 7th, etc.)
-   * Homepage shows first 6 members in this layout.
+   * Chunk team members by priority: 3 cards per row on the homepage grid.
+   * Homepage shows first 6 members (two full rows when there are 6+).
    */
   const displayedRows = ((): ExecutiveCommitteeTeamMemberDTO[][] => {
     const sorted = [...teamMembers].sort((a, b) => (a.priorityOrder ?? 0) - (b.priorityOrder ?? 0));
@@ -157,10 +156,9 @@ const TeamSection: React.FC = () => {
     if (take === 0) return [];
     const list = sorted.slice(0, take);
     const rows: ExecutiveCommitteeTeamMemberDTO[][] = [];
-    rows.push(list.slice(0, 1));   // Row 1: only rank 1 (single card)
-    let i = 1;
+    let i = 0;
     while (i < list.length) {
-      rows.push(list.slice(i, i + 3)); // Row 2+: 3 per row
+      rows.push(list.slice(i, i + 3));
       i += 3;
     }
     return rows;
@@ -172,8 +170,8 @@ const TeamSection: React.FC = () => {
   }
 
   return (
-    <div id="team-section" className="py-24 bg-gradient-to-br from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div id="team-section" className="py-24 bg-green-50">
+      <HomeSectionRail eyebrow="Our team" containerClassName="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Profile "Read more" popup */}
         <Modal
           isOpen={!!profileModalMember}
@@ -269,26 +267,16 @@ const TeamSection: React.FC = () => {
         </Modal>
 
         {/* Section Header */}
-        <div className="mb-20 flex flex-col lg:flex-row justify-between items-start lg:items-end space-y-6 lg:space-y-0">
-          <div className="max-w-2xl">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-6 h-3 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full"></div>
-              <p className="text-gray-600 font-medium">Our team</p>
-            </div>
-
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-light leading-tight tracking-tight text-gray-900">
-              Meet our amazing{' '}
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent font-medium">
-                team
-              </span>
-            </h2>
-            <p className="text-lg text-gray-600 mt-4 leading-relaxed">
-              Dedicated professionals working together to make a positive impact in our communities.
-            </p>
-          </div>
+        <div className="mb-20 text-center">
+          <HomeSectionTitle className="text-4xl md:text-5xl lg:text-6xl font-light leading-tight tracking-tight">
+            Meet our amazing team
+          </HomeSectionTitle>
+          <p className="home-section-body-text text-lg text-gray-600 mt-4 leading-relaxed max-w-2xl mx-auto">
+            Dedicated professionals working together to make a positive impact in our communities.
+          </p>
         </div>
 
-        {/* Dynamic Team Grid by priority: row 1 = rank 1 only (1 card), row 2+ = 3 cards per row */}
+        {/* Dynamic Team Grid by priority: 3 cards per row */}
         {teamMembers.length > 0 ? (
           <>
             {displayedRows.map((row, rowIndex) => {
@@ -304,7 +292,7 @@ const TeamSection: React.FC = () => {
                     return (
               <div
                 key={member.id}
-                className={`${styles.teamCard} group relative rounded-[2rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 ease-out hover:-translate-y-3`}
+                className={`${styles.teamCard} team-card group relative rounded-[2rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 ease-out hover:-translate-y-3`}
                 style={{
                   animationDelay: `${globalIndex * 150}ms`,
                 }}
@@ -340,7 +328,7 @@ const TeamSection: React.FC = () => {
                 </div>
 
                 {/* Card Content - flex column with scrollable body so image never gets cut off */}
-                <div className={`${styles.cardContent} flex flex-col min-h-0`}>
+                <div className={`${styles.cardContent} team-card-content flex flex-col min-h-0`}>
                   {/* Name and Title - reduced spacing */}
                   <div className="flex-shrink-0 mb-2">
                     <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors duration-300">
@@ -454,23 +442,21 @@ const TeamSection: React.FC = () => {
               <div className="mt-12 flex justify-center">
                 <Link
                   href="/team"
-                  className="w-full max-w-xs flex-shrink-0 h-14 rounded-xl bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105"
+                  className="hero-browse-link hero-browse-link-neon"
                   title="View All Team Members"
                   aria-label="View All Team Members"
                 >
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-200 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </div>
-                  <span className="font-semibold text-indigo-700">Show More</span>
+                  <span>Show More</span>
+                  <svg className="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
                 </Link>
               </div>
             )}
           </>
         ) : (
           <div className="text-center text-gray-500 py-8">
-            <div className="bg-white rounded-lg shadow-sm p-8 max-w-md mx-auto">
+            <div className="homepage-glass-card services-glass-card-face bg-white rounded-lg p-8 max-w-md mx-auto">
               <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -484,14 +470,14 @@ const TeamSection: React.FC = () => {
 
         {/* Enhanced Stats Section - number removed per request; keep heading and description */}
         <div className="mt-16 text-center">
-          <h3 className="text-xl lg:text-2xl font-semibold text-gray-800 mb-3">
-            Dedicated team members
+          <h3 className="home-section-title text-xl lg:text-2xl font-semibold mb-3">
+            <span className="home-section-title-lead">Dedicated team members</span>
           </h3>
-          <p className="text-gray-600 max-w-md mx-auto">
+          <p className="home-section-body-text text-gray-600 max-w-md mx-auto">
             Building stronger communities through dedication, innovation, and collaborative leadership.
           </p>
         </div>
-      </div>
+      </HomeSectionRail>
     </div>
   );
 };

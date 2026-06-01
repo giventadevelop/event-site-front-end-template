@@ -7,6 +7,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import type { EventDetailsDTO, EventMediaDTO } from '@/types';
 import { useFilteredEvents } from '@/hooks/useFilteredEvents';
 import { useDeferredFetch } from '@/hooks/usePageReady';
+import { EventStripBannerImage } from '@/components/EventStripBannerImage';
 
 interface LiveEventWithMedia {
   event: EventDetailsDTO;
@@ -49,31 +50,25 @@ const LiveEventsSection: React.FC = () => {
   }
 
   return (
-    <section className="pt-0 md:pt-0 pb-0 md:pb-0.5 bg-gradient-to-r from-red-50 to-orange-50">
+    <section className="pt-0 md:pt-0 pb-0 md:pb-0.5 bg-gradient-to-r from-green-50 to-emerald-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Live Events Strip */}
         <div className="space-y-4 md:space-y-6">
           {filteredEvents.map((liveEvent, index) => (
             <div
               key={liveEvent.event.id}
-              className="bg-white rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden h-auto md:h-[200px]"
+              className="homepage-glass-card services-glass-card-face group rounded-2xl shadow-md border border-gray-200/80 hover:shadow-lg transition-all duration-300 overflow-hidden h-auto md:h-[200px]"
             >
-              <div className="flex flex-col md:flex-row h-full">
-                {/* Left Column - Event Image (70% width on desktop; height matches card = 200px on desktop) */}
-                <div className="w-full md:w-[70%] h-48 md:h-full relative overflow-hidden rounded-t-2xl md:rounded-t-none md:rounded-l-2xl">
+              <div className="flex flex-col md:flex-row h-full md:items-stretch">
+                <div className="relative h-48 w-full shrink-0 md:h-full md:w-[70%]">
                   {liveEvent.media.fileUrl ? (
-                    <Image
+                    <EventStripBannerImage
                       src={liveEvent.media.fileUrl}
                       alt={liveEvent.media.altText || liveEvent.event.title}
-                      fill
-                      className="object-cover"
-                      style={{
-                        backgroundColor: 'transparent'
-                      }}
                       priority={index === 0}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <div className="event-card-banner-media event-card-banner-media--strip flex h-full min-h-[12rem] items-center justify-center bg-gray-200 md:min-h-0">
                       <div className="text-center text-gray-500">
                         <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -85,7 +80,7 @@ const LiveEventsSection: React.FC = () => {
                 </div>
 
                 {/* Right Column - Same height as image (200px); compact content, no scrollbar */}
-                <div className="w-full md:w-[30%] md:h-full min-h-0 flex flex-col bg-gradient-to-br from-slate-50 via-white to-amber-50/30 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl relative">
+                <div className="live-event-details-panel w-full md:w-[30%] md:h-full min-h-0 flex flex-col rounded-b-2xl md:rounded-b-none md:rounded-r-2xl relative">
                   {/* Subtle decorative accent */}
                   <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-100/40 to-transparent rounded-bl-full pointer-events-none" />
 

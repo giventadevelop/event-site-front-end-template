@@ -2,7 +2,6 @@
 
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { TenantSettingsDTO } from '@/types';
-import { getAppUrl } from '@/lib/env';
 import { usePageReady } from '@/hooks/usePageReady';
 import {
   getHomepageCacheKey,
@@ -14,6 +13,11 @@ interface TenantSettingsContextType {
   settings: TenantSettingsDTO | null;
   loading: boolean;
   showEventsSection: boolean;
+  /** Squad / band roster carousel on homepage */
+  showSquadSection: boolean;
+  /** Executive committee TeamSection on homepage */
+  showExecutiveCommitteeSection: boolean;
+  /** @deprecated Use showExecutiveCommitteeSection — kept for callers not yet migrated */
   showTeamSection: boolean;
   showSponsorsSection: boolean;
 }
@@ -22,6 +26,8 @@ const TenantSettingsContext = React.createContext<TenantSettingsContextType>({
   settings: null,
   loading: true,
   showEventsSection: true, // Default to true for backward compatibility
+  showSquadSection: false,
+  showExecutiveCommitteeSection: true,
   showTeamSection: true,
   showSponsorsSection: true,
 });
@@ -114,17 +120,14 @@ export const TenantSettingsProvider: React.FC<TenantSettingsProviderProps> = ({ 
       if (!pageReady && retryCount === 0) return;
 
       try {
-        const baseUrl = getAppUrl();
-        const response = await fetch(
-          `${baseUrl}/api/proxy/tenant-settings`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            cache: 'no-store',
-          }
-        );
+        // Same-origin relative URL — matches browser tab (localhost vs 127.0.0.1, port, etc.)
+        const response = await fetch('/api/proxy/tenant-settings', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        });
 
         if (response.ok) {
           const data = await response.json();
@@ -209,13 +212,20 @@ export const TenantSettingsProvider: React.FC<TenantSettingsProviderProps> = ({ 
   // Determine section visibility with fallback to true (show by default)
   // This ensures the app continues to work even if tenant settings fail
   const showEventsSection = settings?.showEventsSectionInHomePage ?? true;
-  const showTeamSection = settings?.showTeamMembersSectionInHomePage ?? true;
+  const showSquadSection = settings?.showTeamMembersSectionInHomePage ?? false;
+  const showExecutiveCommitteeSection =
+    settings?.showExecutiveCommitteeSectionInHomePage ??
+    settings?.showTeamMembersSectionInHomePage ??
+    true;
+  const showTeamSection = showExecutiveCommitteeSection;
   const showSponsorsSection = settings?.showSponsorsSectionInHomePage ?? true;
 
   const contextValue: TenantSettingsContextType = {
     settings,
     loading,
     showEventsSection,
+    showSquadSection,
+    showExecutiveCommitteeSection,
     showTeamSection,
     showSponsorsSection,
   };

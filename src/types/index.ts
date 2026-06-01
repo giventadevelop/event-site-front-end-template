@@ -108,6 +108,8 @@ export interface EventDetailsDTO {
   isRegistrationRequired?: boolean;
   /** Is sports event */
   isSportsEvent?: boolean;
+  /** Is competition event (Kanj-style competitions) */
+  isCompetitionEvent?: boolean;
   /** Is event live */
   isLive?: boolean;
   /** Is featured event */
@@ -187,6 +189,10 @@ export interface EventMediaDTO {
   isEventManagementOfficialDocument?: boolean;
   preSignedUrl?: string;
   preSignedUrlExpiresAt?: string;
+  /** Optional card thumbnail for non-image files (e.g. PDF official documents). */
+  thumbnailUrl?: string;
+  thumbnailPreSignedUrl?: string;
+  thumbnailPreSignedUrlExpiresAt?: string;
   altText?: string;
   displayOrder?: number;
   downloadCount?: number;
@@ -231,6 +237,20 @@ export interface EventMediaDTO {
    */
   priorityRanking?: number;
   /**
+   * Canonical hierarchy path for official document tree rendering.
+   * Example: "Kalpana 2023\\Kalpana 110 Commission\\Kalpana-Commission-1.pdf"
+   */
+  hierarchyPath?: string | null;
+  /**
+   * Human-friendly top-level category label derived from the legacy folder hierarchy.
+   */
+  hierarchyCategoryLabel?: string | null;
+  /**
+   * Dedicated display priority for official documents.
+   * Lower values indicate higher priority (shown first in paginated list).
+   */
+  displayPriority?: number | null;
+  /**
    * Reference to gallery album. Mutually exclusive with eventId (media belongs to either an event OR an album, not both).
    */
   albumId?: number;
@@ -238,6 +258,40 @@ export interface EventMediaDTO {
    * Reference to event_focus_groups association (event-focus-group link). Optional; when set, media is scoped to that focus group for this event.
    */
   eventFocusGroupId?: number | null;
+  /** FK to public.official_document_category when isEventManagementOfficialDocument is true (tenant library). */
+  officialDocumentCategoryId?: number | null;
+  /** Calendar year segment for official-document S3 path (e.g. 2025). */
+  officialDocumentYear?: number | null;
+}
+
+/**
+ * Tenant-scoped official document category lookup (Church Resources).
+ */
+export interface OfficialDocumentCategoryDTO {
+  id?: number;
+  tenantId?: string;
+  slug: string;
+  displayName: string;
+  description?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Per-tenant, per-category, per-year bundle for official document library cover (see official_document_year_bundle).
+ */
+export interface OfficialDocumentYearBundleDTO {
+  id?: number;
+  tenantId?: string;
+  officialDocumentCategoryId: number;
+  documentYear: number;
+  coverEventMediaId?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
+  /** When API embeds the cover media row */
+  coverEventMedia?: Partial<EventMediaDTO> | null;
 }
 
 /**
@@ -632,6 +686,8 @@ export interface TenantSettingsDTO {
   customJs?: string;
   showEventsSectionInHomePage?: boolean;
   showTeamMembersSectionInHomePage?: boolean;
+  /** When true, homepage shows executive committee TeamSection (migrated from legacy team flag). */
+  showExecutiveCommitteeSectionInHomePage?: boolean;
   showSponsorsSectionInHomePage?: boolean;
   isMembershipSubscriptionEnabled?: boolean;
   homepageCacheVersion?: number;
@@ -1603,4 +1659,144 @@ export interface ManualPaymentSummaryReportDTO {
   requestCount: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// --- Event Competitions ---
+
+export type CompetitionAudienceMode = 'YOUTH' | 'ADULT' | 'MIXED';
+export type CompetitionRegistrationMode = 'PARENT_CHILD' | 'SELF' | 'TEAM_CAPTAIN' | 'MIXED';
+export type CompetitionResultsDisplayMode = 'FULL_NAME' | 'INITIALS' | 'ANONYMOUS';
+export type CompetitionType = 'INDIVIDUAL' | 'GROUP';
+export type CompetitionEligibleAudience = 'YOUTH_ONLY' | 'ADULT_ONLY' | 'ALL';
+export type CompetitionParticipantType = 'CHILD' | 'ADULT' | 'TEAM_MEMBER';
+export type CompetitionRegistrationStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'CANCELLED' | 'REFUNDED';
+
+export interface EventCompetitionSettingsDTO {
+  id?: number | null;
+  tenantId?: string;
+  audienceMode: CompetitionAudienceMode;
+  registrationMode: CompetitionRegistrationMode;
+  registrationDeadline?: string | null;
+  registrationOpen: boolean;
+  allowTicketSales: boolean;
+  pointsFirst: number;
+  pointsSecond: number;
+  pointsThird: number;
+  championEnabled: boolean;
+  championExcludeGroupPoints: boolean;
+  championMaxCategory?: number | null;
+  resultsDisplayMode?: CompetitionResultsDisplayMode | null;
+  eligibilityText?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  event?: EventDetailsDTO;
+}
+
+export interface EventCompetitionDayDTO {
+  id?: number | null;
+  tenantId?: string;
+  dayLabel: string;
+  eventDate: string;
+  venueName: string;
+  venueAddress?: string | null;
+  sortOrder: number;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  event?: EventDetailsDTO;
+}
+
+export interface EventCompetitionDTO {
+  id?: number | null;
+  tenantId?: string;
+  name: string;
+  description?: string | null;
+  competitionType: CompetitionType;
+  eligibleAudience: CompetitionEligibleAudience;
+  categoryCode?: string | null;
+  divisionLabel?: string | null;
+  track?: string | null;
+  feeAmount: number;
+  maxParticipants?: number | null;
+  minGroupSize?: number | null;
+  maxGroupSize?: number | null;
+  timeLimitMinutes?: number | null;
+  requiresSoundtrack: boolean;
+  judgmentCriteriaJson?: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  event?: EventDetailsDTO;
+  competitionDay?: EventCompetitionDayDTO;
+}
+
+export interface EventCompetitionParticipantDTO {
+  id?: number | null;
+  tenantId?: string;
+  participantType: CompetitionParticipantType;
+  clerkUserId: string;
+  firstName: string;
+  lastName: string;
+  displayName?: string | null;
+  dateOfBirth?: string | null;
+  currentGrade?: number | null;
+  schoolName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  userProfile?: UserProfileDTO;
+  guardianUserProfile?: UserProfileDTO;
+}
+
+export interface EventCompetitionRegistrationDTO {
+  id?: number | null;
+  tenantId?: string;
+  registrationStatus: CompetitionRegistrationStatus;
+  feeAmount: number;
+  effectiveCategory?: string | null;
+  stripePaymentIntentId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  event?: EventDetailsDTO;
+  competition?: EventCompetitionDTO;
+  participantProfile?: EventCompetitionParticipantDTO;
+  groupLeaderRegistration?: EventCompetitionRegistrationDTO | null;
+  registeredByUserProfile?: UserProfileDTO;
+}
+
+export interface EventCompetitionResultDTO {
+  id?: number | null;
+  tenantId?: string;
+  displayName: string;
+  placement?: number | null;
+  placementLabel?: string | null;
+  prizeTitle?: string | null;
+  prizeDetails?: string | null;
+  pointsAwarded: number;
+  winnerPhotoUrl?: string | null;
+  notes?: string | null;
+  isPublished: boolean;
+  publishedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  event?: EventDetailsDTO;
+  competition?: EventCompetitionDTO;
+  participantProfile?: EventCompetitionParticipantDTO;
+  registration?: EventCompetitionRegistrationDTO;
+  winnerMedia?: EventMediaDTO;
+}
+
+export interface EventCompetitionContentBlockDTO {
+  id?: number | null;
+  tenantId?: string;
+  blockType: string;
+  title?: string | null;
+  bodyMarkdown: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+  event?: EventDetailsDTO;
 }

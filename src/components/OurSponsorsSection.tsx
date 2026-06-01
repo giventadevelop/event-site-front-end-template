@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState, useLayoutEffect } from 'react';
+import { HomeSectionRail } from '@/components/HomeSectionRail';
+import { HomeSectionTitle } from '@/components/HomeSectionTitle';
 import Link from 'next/link';
 import type { EventSponsorsDTO } from "@/types";
-import { getAppUrl, getTenantId } from '@/lib/env';
+import { getTenantId } from '@/lib/env';
 import { useDeferredFetch } from '@/hooks/usePageReady';
 import { SponsorCard } from '@/components/sponsors/SponsorCard';
 import { getHomepageCacheKey } from '@/lib/homepageCacheKeys';
@@ -34,28 +36,11 @@ const OurSponsorsSection: React.FC = () => {
     } catch (_) { /* ignore */ }
   }, [CACHE_KEY, CACHE_DURATION]);
 
-  // Array of modern background colors (same as events page)
-  const cardBackgrounds = [
-    'bg-gradient-to-br from-blue-50 to-blue-100',
-    'bg-gradient-to-br from-green-50 to-green-100',
-    'bg-gradient-to-br from-purple-50 to-purple-100',
-    'bg-gradient-to-br from-pink-50 to-pink-100',
-    'bg-gradient-to-br from-yellow-50 to-yellow-100',
-    'bg-gradient-to-br from-indigo-50 to-indigo-100',
-    'bg-gradient-to-br from-teal-50 to-teal-100',
-    'bg-gradient-to-br from-orange-50 to-orange-100',
-    'bg-gradient-to-br from-cyan-50 to-cyan-100',
-    'bg-gradient-to-br from-rose-50 to-rose-100'
-  ];
-
-  // Function to get random background color for each sponsor
-  const getRandomBackground = (index: number) => {
-    return cardBackgrounds[index % cardBackgrounds.length];
-  };
+  const getHomepageGlassCardClass = () =>
+    'homepage-glass-card services-glass-card-face';
 
   // Resolve banner URL from event_medias (SPONSOR_BANNER, lowest priority first). Runs on every load so new/updated media shows.
   async function resolveBannersForSponsors(
-    baseUrl: string,
     limitedSponsors: EventSponsorsDTO[]
   ): Promise<EventSponsorsDTO[]> {
     return Promise.all(
@@ -68,7 +53,8 @@ const OurSponsorsSection: React.FC = () => {
             sort: 'priorityRanking,asc',
             size: '1',
           });
-          const bannerRes = await fetch(`${baseUrl}/api/proxy/event-medias?${bannerParams.toString()}`, { cache: 'no-store' });
+          // Same-origin relative URL — avoids CORS when tab is 127.0.0.1 vs localhost or non-3000 port
+          const bannerRes = await fetch(`/api/proxy/event-medias?${bannerParams.toString()}`, { cache: 'no-store' });
           if (!bannerRes.ok) return { ...s };
           const bannerData = await bannerRes.json();
           let bannerMedia: { fileUrl?: string }[] = [];
@@ -89,8 +75,6 @@ const OurSponsorsSection: React.FC = () => {
 
   useEffect(() => {
     async function fetchSponsors() {
-      const baseUrl = getAppUrl();
-
       // Defer network request until page is ready + delay
       if (!shouldFetch) return;
 
@@ -122,7 +106,7 @@ const OurSponsorsSection: React.FC = () => {
             size: '15',
             'isActive.equals': 'true'
           });
-          const response = await fetch(`${baseUrl}/api/proxy/event-sponsors?${params.toString()}`, {
+          const response = await fetch(`/api/proxy/event-sponsors?${params.toString()}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
             cache: 'no-store',
@@ -144,7 +128,7 @@ const OurSponsorsSection: React.FC = () => {
         }
 
         // Always resolve banners from event_medias so new/updated images (e.g. priority 1) show without waiting for cache expiry
-        const sponsorsWithBanners = await resolveBannersForSponsors(baseUrl, rawSponsors);
+        const sponsorsWithBanners = await resolveBannersForSponsors(rawSponsors);
         setSponsors(sponsorsWithBanners);
       } catch (error) {
         console.error('Error fetching sponsors:', error);
@@ -164,19 +148,15 @@ const OurSponsorsSection: React.FC = () => {
 
   if (fetchError) {
     return (
-      <section className="py-24 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-24 bg-green-50">
+        <HomeSectionRail eyebrow="Sponsors" containerClassName="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <div className="w-5 h-2 bg-yellow-400 rounded"></div>
-              <p className="text-gray-600 font-medium">Sponsors</p>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <HomeSectionTitle className="text-3xl md:text-4xl font-bold mb-4">
               Our Sponsors
-            </h2>
+            </HomeSectionTitle>
           </div>
           <div className="text-center text-gray-500 py-8">
-            <div className="bg-white rounded-lg shadow-sm p-8 max-w-md mx-auto">
+            <div className="homepage-glass-card services-glass-card-face bg-white rounded-lg p-8 max-w-md mx-auto">
               <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -186,26 +166,22 @@ const OurSponsorsSection: React.FC = () => {
               <p className="text-gray-500">We're currently updating our sponsors information. Please check back later.</p>
             </div>
           </div>
-        </div>
+        </HomeSectionRail>
       </section>
     );
   }
 
   if (sponsors.length === 0) {
     return (
-      <section className="py-24 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-24 bg-green-50">
+        <HomeSectionRail eyebrow="Sponsors" containerClassName="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <div className="w-5 h-2 bg-yellow-400 rounded"></div>
-              <p className="text-gray-600 font-medium">Sponsors</p>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <HomeSectionTitle className="text-3xl md:text-4xl font-bold mb-4">
               Our Sponsors
-            </h2>
+            </HomeSectionTitle>
           </div>
           <div className="text-center text-gray-500 py-8">
-            <div className="bg-white rounded-lg shadow-sm p-8 max-w-md mx-auto">
+            <div className="homepage-glass-card services-glass-card-face bg-white rounded-lg p-8 max-w-md mx-auto">
               <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -215,35 +191,33 @@ const OurSponsorsSection: React.FC = () => {
               <p className="text-gray-500">We're currently seeking sponsors for our events. Contact us to learn about sponsorship opportunities!</p>
             </div>
           </div>
-        </div>
+        </HomeSectionRail>
       </section>
     );
   }
 
   return (
-    <section className="py-24 bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-24 bg-green-50">
+      <HomeSectionRail eyebrow="Sponsors" containerClassName="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-5 h-2 bg-yellow-400 rounded"></div>
-            <p className="text-gray-600 font-medium">Sponsors</p>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <HomeSectionTitle className="text-3xl md:text-4xl font-bold mb-4">
             Our Sponsors
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          </HomeSectionTitle>
+          <p className="home-section-body-text text-lg text-gray-600 max-w-2xl mx-auto">
             Grateful for the support of our amazing sponsors who make our events and community initiatives possible
           </p>
         </div>
 
-        {/* Sponsors List - Single column layout with equal height cards */}
-        <div className="space-y-8 mb-8">
+        {/* Sponsors grid — two per row on large screens; cards stretch to equal height */}
+        <div className="mb-8 grid grid-cols-1 items-stretch gap-8 lg:grid-cols-2">
           {sponsors.map((sponsor, index) => (
             <SponsorCard
               key={sponsor.id ?? index}
               sponsor={sponsor}
-              backgroundClass={getRandomBackground(index)}
+              backgroundClass={getHomepageGlassCardClass()}
+              bodyLayout="split"
+              className="h-full min-w-0"
               onCardClick={() => sponsor.websiteUrl && window.open(sponsor.websiteUrl, '_blank')}
             />
           ))}
@@ -253,20 +227,17 @@ const OurSponsorsSection: React.FC = () => {
         <div className="text-center">
           <Link
             href="/sponsors"
-            className="inline-flex flex-shrink-0 h-14 rounded-xl bg-indigo-100 hover:bg-indigo-200 items-center justify-center gap-3 transition-all duration-300 hover:scale-105 px-6"
+            className="hero-browse-link hero-browse-link-neon"
             title="See All Sponsors"
             aria-label="See All Sponsors"
           >
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-200 flex items-center justify-center">
-              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-            <span className="font-semibold text-indigo-700">See All Sponsors</span>
+            <span>See All Sponsors</span>
+            <svg className="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
           </Link>
         </div>
-      </div>
-
+      </HomeSectionRail>
     </section>
   );
 };

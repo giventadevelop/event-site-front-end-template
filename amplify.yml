@@ -7,21 +7,19 @@ frontend:
         - npm ci
     build:
       commands:
-        # Prevent JavaScript heap out of memory during Next.js build (Amplify default heap is too small)
-        - export NODE_OPTIONS="--max-old-space-size=4096"
+        # Large build compute (16GiB): give webpack headroom; keep 1 page-data worker (next.config experimental.cpus).
+        # 3584MB heap caused "JavaScript heap out of memory" during webpack; 3 workers caused spawn ENOMEM earlier.
+        - export NODE_OPTIONS="--max-old-space-size=10240"
+        - export NEXT_BUILD_WORKERS=1
         # Required for Next.js Lambda React bundling on Amplify
         - echo "__NEXT_PRIVATE_PREBUNDLED_REACT=next" >> .env.production
         # Inject Amplify environment variables into .env.production for SSR Lambda runtime
         - env | grep -E '^(NEXT_PUBLIC_|AMPLIFY_|STRIPE_|CLERK_|API_JWT|DATABASE_URL|DIRECT_URL|POOLED_URL|SUPABASE_|STRAPI_)' >> .env.production || true
+        # Optional: AMPLIFY_ROUTE_SET=redesign-only drops mosc + mosc-old (~600 routes) to fit ~220MB cap
+        - node scripts/amplify-prepare-build.mjs
         - npm run build
-        # CRITICAL: Do not ship .next/cache in the deploy artifact (webpack/turbopack incremental cache only).
-        # It is not used at runtime and often pushes the zip over Amplify's ~220MB build-output limit.
-        - rm -rf .next/cache
-        # Typegen only — not needed to run the app in Lambda
-        - rm -rf .next/types
-        # Next.js 16+ can leave a large .next/dev tree (Turbopack/webpack dev artifacts); not used at runtime.
-        # Removing it is required to stay under Amplify SSR ~220MB deploy artifact limit.
-        - rm -rf .next/dev
+        # Shrink .next under Amplify ~220MB SSR cap (maps, cache, .next/node_modules, @swc/@esbuild binaries).
+        - node scripts/prune-amplify-next-artifact.mjs
   artifacts:
     baseDirectory: .next
     files:

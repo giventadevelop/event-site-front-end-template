@@ -1,11 +1,12 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Anek_Malayalam } from "next/font/google";
 import InteractiveWorldMap from "@/components/ui/InteractiveWorldMap";
 import MoscRedesignHeader from "@/components/mosc-redesign/MoscRedesignHeader";
 import MoscRedesignFooter from "@/components/mosc-redesign/MoscRedesignFooter";
+import ZohoSalesIqWidget from "@/components/mosc-redesign/ZohoSalesIqWidget";
+import MoscRedesignSaintsCarousel from "@/components/mosc-redesign/MoscRedesignSaintsCarousel";
 import type { LiturgyReading } from "@/app/mosc/components/SyroLiturgySection";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -59,26 +60,107 @@ const regions: Region[] = [
 { id: "india", label: "India" }];
 
 
-const anekMalayalam = Anek_Malayalam({
-  subsets: ["latin", "malayalam"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
 function formatLiturgyDisplayDate(liturgyDate: string | null): string {
   const d = liturgyDate ? new Date(`${liturgyDate}T12:00:00`) : new Date();
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
 const slides = [
-{
-  image: "/mosc/assets/images/mosc_images/bava_thirumeni_pope_visit_8k.png",
-  alt: "His Holiness Baselios Marthoma Mathews III meeting with Pope Francis at the Vatican"
-},
-{
-  image: "/mosc/assets/images/mosc_images/Banner-image-of-Aramana-Slider_8k.png",
-  alt: "Banner image of Aramana, Malankara Orthodox Syrian Church"
-}];
+  {
+    image: "/mosc/assets/images/mosc_images/bava_hero_slider_church_scene-5.jpeg",
+    alt: "Malankara Orthodox Syrian Church worship scene",
+    objectPosition: "center",
+  },
+  {
+    image: "/mosc/assets/images/mosc_images/Banner-image-of-Aramana-Slider_8k.png",
+    alt: "Banner image of Aramana, Malankara Orthodox Syrian Church",
+    /** Anchor toward top so cross + Catholicate Aramana signage stay in frame (object-cover). */
+    objectPosition: "center 18%",
+  },
+];
+
+interface AboutUsHeritageImage {
+  id: "hero" | "bishops" | "cross";
+  src: string;
+  alt: string;
+  label: string;
+  title: string;
+  imageClassName: string;
+  accent?: string;
+}
+
+const aboutUsHeritageImages: AboutUsHeritageImage[] = [
+  {
+    id: "hero",
+    src: "/images/logos/About US/Chirst-Thomas-AboutUs.jpg",
+    alt: "Christ commissioning St. Thomas the Apostle",
+    label: "Apostolic foundation",
+    title: "St. Thomas in India",
+    imageClassName: "object-cover object-center",
+    accent: "Since AD 52",
+  },
+  {
+    id: "bishops",
+    src: "/images/logos/About US/Bishops-image-AboutUs.jpg",
+    alt: "Bishops gathered in church sanctuary",
+    label: "Living ministry",
+    title: "Shepherds of the faithful",
+    imageClassName: "object-contain object-center",
+  },
+  {
+    id: "cross",
+    src: "/images/logos/About US/Cross-PlateOnly-AboutUs.png",
+    alt: "Orthodox cross on a sacred plate",
+    label: "Sacred tradition",
+    title: "Faith handed down",
+    imageClassName: "object-contain object-center",
+  },
+];
+
+function AboutUsHeritageFigure({
+  item,
+  slotClassName,
+}: {
+  item: AboutUsHeritageImage;
+  slotClassName: string;
+}) {
+  return (
+    <figure
+      className={`about-us-heritage-card about-us-heritage-card--${item.id} about-us-editorial__figure ${slotClassName}`}
+    >
+      <div className="about-us-heritage-card__frame">
+        <div className="about-us-heritage-card__media relative w-full h-full">
+          <Image
+            src={item.src}
+            alt={item.alt}
+            fill
+            sizes={
+              item.id === "hero"
+                ? "(min-width: 1024px) 28vw, 100vw"
+                : "(min-width: 1024px) 18vw, 50vw"
+            }
+            className={item.imageClassName}
+            priority={item.id === "hero"}
+          />
+        </div>
+        {item.accent ? (
+          <span className="about-us-heritage-card__accent" aria-hidden="true">
+            <span className="about-us-heritage-card__accent-dot" />
+            {item.accent}
+          </span>
+        ) : null}
+        <figcaption className="about-us-heritage-card__caption">
+          <span className="about-us-heritage-card__label">{item.label}</span>
+          <span className="about-us-heritage-card__title">{item.title}</span>
+        </figcaption>
+      </div>
+    </figure>
+  );
+}
+
+const aboutUsHeritageById = Object.fromEntries(
+  aboutUsHeritageImages.map((item) => [item.id, item]),
+) as Record<AboutUsHeritageImage["id"], AboutUsHeritageImage>;
 
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -86,12 +168,12 @@ export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [activeRegion, setActiveRegion] = useState("india");
   const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
-  const [saintIndex, setSaintIndex] = useState(0);
   const [readingLang, setReadingLang] = useState<"english" | "malayalam">("english");
   const [liturgyReadings, setLiturgyReadings] = useState<LiturgyReading[] | null>(null);
   const [liturgyDate, setLiturgyDate] = useState<string | null>(null);
   const [liturgyLoading, setLiturgyLoading] = useState(true);
   const [liturgyError, setLiturgyError] = useState<string | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** Ignore out-of-order responses when switching English ↔ Malayalam quickly */
   const liturgyRequestIdRef = useRef(0);
@@ -140,10 +222,33 @@ export default function HomePage() {
     return () => {if (sliderRef.current) clearInterval(sliderRef.current);};
   }, []);
 
-  const visibleSaints = saints.slice(saintIndex, saintIndex + 3);
+  /** Keep hero + quick-access bar within the first viewport below the sticky header. */
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    const header = shell.querySelector("header");
+    if (!header) return;
+
+    const updateHeaderHeight = () => {
+      const height = Math.round(header.getBoundingClientRect().height);
+      shell.style.setProperty("--mosc-redesign-header-h", `${height}px`);
+    };
+
+    updateHeaderHeight();
+    const ro = new ResizeObserver(updateHeaderHeight);
+    ro.observe(header);
+    window.addEventListener("resize", updateHeaderHeight);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", updateHeaderHeight);
+    };
+  }, []);
 
   return (
-    <div className="mosc-redesign-subpage-shell syro-layout min-h-screen flex flex-col bg-parchment font-dm-sans text-warmGray-dark antialiased">
+    <div
+      ref={shellRef}
+      className="mosc-redesign-subpage-shell mosc-redesign-home-shell syro-layout min-h-screen flex flex-col bg-parchment font-dm-sans text-warmGray-dark antialiased"
+    >
       {/*
         Sticky header must NOT sit inside overflow-x-hidden (breaks position:sticky in browsers).
         /mosc uses syro-layout + overflow only on main; we mirror that with a content wrapper.
@@ -151,8 +256,9 @@ export default function HomePage() {
       <MoscRedesignHeader />
 
       <main id="mainContent" className="syro-main flex-1 min-w-0 overflow-x-hidden bg-parchment">
-      {/* ── HERO: mobile = contain + letterbox; md+ = cover, full-bleed panoramic ─ */}
-      <section className="relative w-full min-h-[240px] h-[min(34vh,290px)] sm:min-h-[270px] md:h-auto md:min-h-[350px] md:aspect-[5/2] md:max-h-[min(42vh,490px)] overflow-hidden bg-[#1a1410] md:bg-stone-900">
+      <div className="mosc-home-first-screen">
+      {/* ── HERO: fills first-screen height; image covers slide area (no stretch) ─ */}
+      <section className="mosc-home-hero-section relative w-full overflow-hidden bg-[#1a1410]">
         {slides.map((slide, i) =>
         <div
           key={i}
@@ -164,6 +270,8 @@ export default function HomePage() {
               fill
               priority={i === 0}
               sizes="100vw"
+              className={`object-cover${i === 1 ? " mosc-home-hero-image--aramana" : ""}`}
+              style={{ objectPosition: slide.objectPosition }}
             />
           </div>
         </div>
@@ -187,7 +295,7 @@ export default function HomePage() {
       </section>
 
       {/* ── ICON QUICK ACCESS BAR ──────────────────────────────────────── */}
-      <section className="bg-parchment-deep border-y-2 border-burgundy/20">
+      <section className="mosc-home-quick-access bg-parchment-deep border-y-2 border-burgundy/20">
         <div className="max-w-7xl mx-auto px-4 lg:px-16">
           <div className="grid grid-cols-5 divide-x divide-burgundy/20">
             {[
@@ -255,145 +363,63 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </div>
 
       {/* ── ABOUT US (always visible — IntersectionObserver + opacity-0 caused empty gaps) ─ */}
-      <section className="py-16 md:py-24 bg-parchment border-b border-burgundy/15">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-14 items-center">
-            {/* Heritage narrative bento — left column on desktop */}
-            <div className="order-2 lg:order-1 about-us-heritage-mosaic">
-              <div className="about-us-mosaic-frame">
-                <figure className="about-us-mosaic-tile about-us-mosaic-tile--hero">
-                  <span className="about-us-mosaic-tile__accent">
-                    <span className="about-us-mosaic-tile__accent-dot" aria-hidden />
-                    Since AD 52
-                  </span>
-                  <div className="about-us-mosaic-tile__media">
-                    <Image
-                      src="/images/logos/About US/Chirst-Thomas-AboutUs.jpg"
-                      alt="Christ commissioning St. Thomas the Apostle"
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 42vw"
-                      className="object-cover object-center"
-                    />
-                  </div>
-                  <figcaption className="about-us-mosaic-tile__caption">
-                    <span className="about-us-mosaic-tile__label">Apostolic foundation</span>
-                    <span className="about-us-mosaic-tile__title">St. Thomas in India</span>
-                  </figcaption>
-                </figure>
-
-                <figure className="about-us-mosaic-tile about-us-mosaic-tile--bishops">
-                  <div className="about-us-mosaic-tile__media">
-                    <Image
-                      src="/images/logos/About US/Bishops-image-AboutUs.jpg"
-                      alt="Bishops gathered in church sanctuary"
-                      fill
-                      sizes="(max-width: 1024px) 50vw, 22vw"
-                      className="object-cover object-top"
-                    />
-                  </div>
-                  <figcaption className="about-us-mosaic-tile__caption">
-                    <span className="about-us-mosaic-tile__label">Living ministry</span>
-                    <span className="about-us-mosaic-tile__title">Shepherds of the faithful</span>
-                  </figcaption>
-                </figure>
-
-                <figure className="about-us-mosaic-tile about-us-mosaic-tile--cross">
-                  <div className="about-us-mosaic-tile__media">
-                    <Image
-                      src="/images/logos/About US/Cross-PlateOnly-AboutUs.png"
-                      alt="Orthodox cross on a sacred plate"
-                      fill
-                      sizes="(max-width: 1024px) 50vw, 22vw"
-                      className="object-contain object-center"
-                    />
-                  </div>
-                  <figcaption className="about-us-mosaic-tile__caption">
-                    <span className="about-us-mosaic-tile__label">Sacred tradition</span>
-                    <span className="about-us-mosaic-tile__title">Faith handed down</span>
-                  </figcaption>
-                </figure>
-              </div>
-            </div>
-
-            {/* Text — right column on desktop */}
-            <div className="order-1 lg:order-2">
+      <section className="mosc-home-about-us py-16 md:py-24 bg-parchment border-b border-burgundy/15">
+        <div className="mosc-home-about-us__inner max-w-7xl mx-auto px-6 lg:px-16">
+          <article
+            className="about-us-editorial"
+            aria-labelledby="about-us-heading"
+          >
+            <header className="about-us-editorial__header">
               <span className="inline-block text-burgundy text-xs font-bold tracking-widest uppercase mb-3 border border-burgundy/40 px-3 py-1 rounded-full bg-burgundy/10">
                 About Us
               </span>
-              <h2 className="text-3xl md:text-4xl font-bold text-warmBrown-dark mb-6 leading-tight">
+              <h2
+                id="about-us-heading"
+                className="text-3xl md:text-4xl font-bold text-warmBrown-dark leading-tight max-w-3xl"
+              >
                 The Malankara Orthodox<br />
                 <span className="text-burgundy">Syrian Church</span>
               </h2>
-              <p className="text-warmGray-dark leading-relaxed mb-8 text-base">
+            </header>
+
+            <AboutUsHeritageFigure
+              item={aboutUsHeritageById.hero}
+              slotClassName="about-us-editorial__figure--hero"
+            />
+
+            <div className="about-us-editorial__intro">
+              <p className="text-warmGray-dark leading-relaxed text-base md:text-[1.0625rem]">
                 The Malankara Orthodox Syrian Church traces its origins to the Apostolic ministry of St. Thomas in India. We are a community rooted in ancient traditions, committed to preserving the faith handed down through generations while serving our members with love, compassion, and spiritual guidance.
               </p>
+            </div>
+
+            <AboutUsHeritageFigure
+              item={aboutUsHeritageById.cross}
+              slotClassName="about-us-editorial__figure--cross"
+            />
+
+            <div className="about-us-editorial__cta">
               <Link
                 href="/mosc-redesign/the-church/the-malankara-orthodox-syrian-church"
-                className="inline-flex items-center gap-2 bg-burgundy text-white font-semibold px-6 py-3 rounded-lg hover:bg-burgundy-light transition-all duration-300 text-sm hover:shadow-lg hover:shadow-burgundy/40 hover:-translate-y-0.5 transform">
+                className="inline-flex items-center gap-2 bg-burgundy text-white font-semibold px-6 py-3 rounded-lg hover:bg-burgundy-light transition-all duration-300 text-sm hover:shadow-lg hover:shadow-burgundy/40 hover:-translate-y-0.5 transform"
+              >
                 Know More
                 <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
               </Link>
             </div>
-          </div>
 
-          {/* Saints Carousel */}
-          <div className="mt-20">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <span className="text-burgundy text-xs font-bold tracking-widest uppercase">Heritage</span>
-                <h3 className="text-2xl font-bold text-warmBrown-dark mt-1">Our Saints & Blesseds</h3>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSaintIndex(Math.max(0, saintIndex - 1))}
-                  disabled={saintIndex === 0}
-                  className="w-9 h-9 rounded-full border border-burgundy/40 flex items-center justify-center text-burgundy hover:bg-burgundy hover:text-white hover:border-burgundy disabled:opacity-30 transition-all duration-200"
-                  aria-label="Previous saint">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setSaintIndex(Math.min(saints.length - 3, saintIndex + 1))}
-                  disabled={saintIndex >= saints.length - 3}
-                  className="w-9 h-9 rounded-full border border-burgundy/40 flex items-center justify-center text-burgundy hover:bg-burgundy hover:text-white hover:border-burgundy disabled:opacity-30 transition-all duration-200"
-                  aria-label="Next saint">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            <AboutUsHeritageFigure
+              item={aboutUsHeritageById.bishops}
+              slotClassName="about-us-editorial__figure--bishops"
+            />
+          </article>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-              {visibleSaints.map((saint) =>
-              <Link
-                key={saint.name}
-                href={saint.href}
-                className="group relative mx-auto w-3/4 rounded-xl overflow-hidden aspect-[6/5] block border border-burgundy/20 bg-parchment-deep hover:border-burgundy/60 transition-all duration-300 hover:shadow-xl hover:shadow-burgundy/30 hover:-translate-y-1 transform">
-                <Image
-                  src={saint.image}
-                  alt={saint.alt}
-                  fill
-                  quality={95}
-                  sizes="(max-width: 640px) 75vw, (max-width: 768px) 37.5vw, 25vw"
-                  className={`object-contain object-top transition-transform duration-500 ${saint.imageClassName ?? "group-hover:scale-105"}`}
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-warmBrown-dark/90 via-warmBrown-dark/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <p className="saint-card-title font-semibold text-sm leading-tight">{saint.name}</p>
-                  <span className="text-warmGold text-xs mt-1 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                    Learn more <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                  </span>
-                </div>
-              </Link>
-              )}
-            </div>
-          </div>
+          <MoscRedesignSaintsCarousel saints={saints} />
         </div>
       </section>
 
@@ -415,7 +441,7 @@ export default function HomePage() {
             <div className="lg:col-span-2 flex justify-center lg:justify-start">
               <div className="w-full max-w-[320px] rounded-2xl overflow-hidden aspect-[3/4] relative shadow-xl border border-burgundy/30 hover:border-burgundy/60 transition-all duration-300 hover:shadow-burgundy/30">
                 <Image
-                  src="/mosc/assets/images/mosc_images/Baselios_Marthoma_Mathews_III_Halo.jpg"
+                  src="/images/holy-synod/H.H-Baselios-Marthoma-Mathews-III.jpg"
                   alt="His Holiness Baselios Marthoma Mathews III, Catholicos of the East and Malankara Metropolitan, in full episcopal vestments"
                   fill
                   className="object-cover" />
@@ -491,7 +517,7 @@ export default function HomePage() {
 
               <div
                 className={`bg-gradient-to-b from-parchment-deep to-parchment rounded-xl p-5 border border-burgundy/25 shadow-inner ${
-                  readingLang === "malayalam" ? anekMalayalam.className : "font-dm-sans"
+                  readingLang === "malayalam" ? "font-anek-malayalam" : "font-dm-sans"
                 }`}
                 lang={readingLang === "malayalam" ? "ml" : "en"}
               >
@@ -594,7 +620,7 @@ export default function HomePage() {
             </button>
             )}
             <Link
-              href="/mosc-redesign/dioceses"
+              href="/mosc-redesign/directory"
               className="px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 border border-burgundy/30 text-warmBrown hover:border-burgundy hover:text-white hover:bg-burgundy hover:shadow-md hover:shadow-burgundy/30 hover:scale-105"
             >
               More Locations
@@ -611,6 +637,7 @@ export default function HomePage() {
 
       </main>
       <MoscRedesignFooter />
+      <ZohoSalesIqWidget />
     </div>);
 
 }

@@ -19,11 +19,13 @@ import {
   fetchTenantOfficialDocumentsServer,
   patchOfficialDocumentMediaServer,
   patchOfficialDocumentYearBundleServer,
+  type OfficialDocumentSearchField,
 } from './ApiServerActions';
 import Modal from '@/components/ui/Modal';
 import {
   getEventMediaDisplayThumbnailUrl,
   getOfficialDocumentPlaceholderKind,
+  OFFICIAL_DOCUMENT_CARD_THUMBNAIL_RECOMMENDED,
   placeholderGradient,
   placeholderLabel,
 } from '@/lib/officialDocumentThumbnail';
@@ -37,6 +39,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+const DOCUMENT_SEARCH_FIELDS: { label: string; value: OfficialDocumentSearchField }[] = [
+  { label: 'Title', value: 'title' },
+  { label: 'Description', value: 'description' },
+  { label: 'Media ID', value: 'id' },
+  { label: 'File type', value: 'eventMediaType' },
+];
 
 function isImageMedia(d: EventMediaDTO): boolean {
   const t = (d.eventMediaType || '').toLowerCase();
@@ -53,6 +62,60 @@ function resolveCoverPreviewUrl(
   if (nested) return nested;
   const doc = docs.find((x) => x.id === bundle.coverEventMediaId);
   return doc?.preSignedUrl || doc?.fileUrl || undefined;
+}
+
+function OfficialDocumentThumbnailUploadGuidance({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-gray-700 space-y-2 ${className}`}
+      role="note"
+      aria-label="Recommended thumbnail size"
+    >
+      <p className="font-semibold text-blue-800">Recommended thumbnail size</p>
+      <p className="text-gray-600">
+        Download cards use a <span className="font-medium text-gray-800">16:10</span> preview frame (
+        <code className="text-[11px]">aspect-[16/10]</code>).
+      </p>
+      <table className="w-full border-collapse text-left">
+        <tbody>
+          <tr className="border-b border-blue-100">
+            <th scope="row" className="py-1 pr-3 font-semibold text-gray-800 align-top whitespace-nowrap">
+              Aspect ratio
+            </th>
+            <td className="py-1">16:10 (landscape)</td>
+          </tr>
+          <tr className="border-b border-blue-100">
+            <th scope="row" className="py-1 pr-3 font-semibold text-gray-800 align-top whitespace-nowrap">
+              Recommended upload
+            </th>
+            <td className="py-1">
+              {OFFICIAL_DOCUMENT_CARD_THUMBNAIL_RECOMMENDED.label} (good for retina; minimum 640×400 px)
+            </td>
+          </tr>
+          <tr className="border-b border-blue-100">
+            <th scope="row" className="py-1 pr-3 font-semibold text-gray-800 align-top whitespace-nowrap">
+              Format
+            </th>
+            <td className="py-1">JPG or PNG</td>
+          </tr>
+          <tr>
+            <th scope="row" className="py-1 pr-3 font-semibold text-gray-800 align-top whitespace-nowrap">
+              Display fit
+            </th>
+            <td className="py-1">
+              <code className="text-[11px]">object-cover</code> — center important content; edges may crop slightly
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="text-gray-600">
+        On desktop (~3 columns in <code className="text-[11px]">max-w-7xl</code>), each thumbnail is roughly{' '}
+        <span className="font-medium text-gray-800">360 px wide × 225 px tall</span>. Upload at{' '}
+        <span className="font-medium text-gray-800">{OFFICIAL_DOCUMENT_CARD_THUMBNAIL_RECOMMENDED.label}</span> so it
+        stays sharp on high-DPI screens.
+      </p>
+    </div>
+  );
 }
 
 type Props = {
@@ -107,6 +170,9 @@ export default function OfficialDocumentsClient({
 
   const [filterYear, setFilterYear] = useState<number | ''>('');
   const [filterCategoryId, setFilterCategoryId] = useState<number | ''>('');
+  const [searchField, setSearchField] = useState<OfficialDocumentSearchField>('title');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterIsPublic, setFilterIsPublic] = useState<'' | 'true' | 'false'>('');
   const [bundleError, setBundleError] = useState<string | null>(null);
   const [bundleBusy, setBundleBusy] = useState(false);
   const [coverSelectId, setCoverSelectId] = useState<number | '' | 'none'>('none');
@@ -236,14 +302,22 @@ export default function OfficialDocumentsClient({
     }
   };
 
+  const buildListFilters = useCallback(() => {
+    const trimmed = searchTerm.trim();
+    return {
+      ...(filterYear !== '' ? { year: filterYear } : {}),
+      ...(filterCategoryId !== '' ? { officialDocumentCategoryId: filterCategoryId } : {}),
+      ...(trimmed ? { searchField, searchTerm: trimmed } : {}),
+      ...(filterIsPublic === 'true' ? { isPublic: true as const } : {}),
+      ...(filterIsPublic === 'false' ? { isPublic: false as const } : {}),
+    };
+  }, [filterYear, filterCategoryId, searchField, searchTerm, filterIsPublic]);
+
   const reloadDocuments = useCallback(
     async (page: number) => {
       setListLoading(true);
       try {
-        const filters = {
-          ...(filterYear !== '' ? { year: filterYear } : {}),
-          ...(filterCategoryId !== '' ? { officialDocumentCategoryId: filterCategoryId } : {}),
-        };
+        const filters = buildListFilters();
         let result = await fetchTenantOfficialDocumentsPagedServer({
           page,
           size: pageSize,
@@ -264,8 +338,29 @@ export default function OfficialDocumentsClient({
         setListLoading(false);
       }
     },
-    [filterYear, filterCategoryId, pageSize]
+    [buildListFilters, pageSize]
   );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void reloadDocuments(0);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm, searchField, filterIsPublic, reloadDocuments]);
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setSearchField('title');
+    setFilterIsPublic('');
+  };
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    categories.forEach((c) => {
+      if (c.id != null) map.set(c.id, c.displayName || c.slug);
+    });
+    return map;
+  }, [categories]);
 
   const openEdit = (row: EventMediaDTO) => {
     setEditError(null);
@@ -739,6 +834,7 @@ export default function OfficialDocumentsClient({
               <p className="text-xs text-gray-500 mb-2">
                 Applied to every file in this batch (PDF/Office previews on the public downloads page).
               </p>
+              <OfficialDocumentThumbnailUploadGuidance className="mb-3" />
               <label className="inline-flex cursor-pointer items-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-800 hover:bg-violet-100">
                 <input
                   ref={bulkThumbnailInputRef}
@@ -864,7 +960,8 @@ export default function OfficialDocumentsClient({
               Add one file…
             </button>
             <p className="text-sm text-gray-500">
-              Page {currentPage + 1} — {totalElements} total. Filters apply when you click Apply.
+              Page {currentPage + 1} — {totalElements} total. Year/category filters apply when you click Apply;
+              text search above the table updates automatically.
             </p>
           </div>
         </div>
@@ -971,13 +1068,77 @@ export default function OfficialDocumentsClient({
             <span className="text-sm text-gray-500">Loading…</span>
           )}
         </div>
+
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Search documents</label>
+              <div className="flex items-stretch">
+                <select
+                  value={searchField}
+                  onChange={(e) => setSearchField(e.target.value as OfficialDocumentSearchField)}
+                  className="border border-gray-400 rounded-l-xl focus:ring-blue-500 focus:border-blue-500 px-3 py-2.5 text-sm min-h-[44px] bg-white shrink-0"
+                  aria-label="Search field"
+                >
+                  {DOCUMENT_SEARCH_FIELDS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type={searchField === 'id' ? 'number' : 'text'}
+                  placeholder={`Search by ${DOCUMENT_SEARCH_FIELDS.find((f) => f.value === searchField)?.label ?? 'field'}…`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void reloadDocuments(0);
+                  }}
+                  className="block w-full border border-gray-400 border-l-0 rounded-r-xl focus:ring-blue-500 focus:border-blue-500 px-4 py-2.5 text-sm min-h-[44px]"
+                  aria-label="Search term"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Public visibility</label>
+              <select
+                value={filterIsPublic}
+                onChange={(e) => setFilterIsPublic(e.target.value as '' | 'true' | 'false')}
+                className="block w-full border border-gray-400 rounded-xl focus:ring-blue-500 focus:border-blue-500 px-4 py-2.5 text-sm min-h-[44px] bg-white"
+                aria-label="Filter by public visibility"
+              >
+                <option value="">All</option>
+                <option value="true">Public only</option>
+                <option value="false">Private only</option>
+              </select>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void reloadDocuments(0)}
+                className="px-4 py-2.5 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-800 text-sm font-semibold transition-all min-h-[44px]"
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                disabled={!searchTerm && filterIsPublic === '' && searchField === 'title'}
+                className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium transition-all min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category id</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Public</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Link</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -997,7 +1158,11 @@ export default function OfficialDocumentsClient({
                       {d.title}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{d.officialDocumentYear ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{d.officialDocumentCategoryId ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {d.officialDocumentCategoryId != null
+                        ? categoryNameById.get(d.officialDocumentCategoryId) ?? `#${d.officialDocumentCategoryId}`
+                        : '—'}
+                    </td>
                     <td className="px-4 py-3 text-sm">{d.isPublic ? 'Yes' : 'No'}</td>
                     <td className="px-4 py-3 text-sm">
                       {(d.preSignedUrl || d.fileUrl) ? (
@@ -1167,12 +1332,17 @@ export default function OfficialDocumentsClient({
           {editing && (
             <div className="rounded-lg border border-gray-200 p-4 space-y-3">
               <p className="text-sm font-medium text-gray-800">Card thumbnail</p>
+              <OfficialDocumentThumbnailUploadGuidance />
               {(() => {
                 const previewUrl = getEventMediaDisplayThumbnailUrl({
                   fileUrl: editing.fileUrl,
-                  thumbnailUrl: editing.thumbnailPreSignedUrl || editing.thumbnailUrl,
+                  thumbnailUrl: editing.thumbnailUrl,
+                  thumbnailPreSignedUrl: editing.thumbnailPreSignedUrl,
                   fileDataContentType: editing.fileDataContentType || editing.contentType,
                   title: editing.title,
+                }, {
+                  thumbnailExpiresAtIso: editing.thumbnailPreSignedUrlExpiresAt,
+                  fileExpiresAtIso: editing.preSignedUrlExpiresAt,
                 });
                 const kind = getOfficialDocumentPlaceholderKind({
                   fileUrl: editing.fileUrl,
@@ -1317,12 +1487,19 @@ export default function OfficialDocumentsClient({
           </label>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Card thumbnail (optional)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setQaThumbnailFile(e.target.files?.[0] ?? null)}
-              className="w-full text-sm"
-            />
+            <OfficialDocumentThumbnailUploadGuidance className="mb-3" />
+            <label className="inline-flex cursor-pointer items-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-800 hover:bg-violet-100">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setQaThumbnailFile(e.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
+              Choose thumbnail
+            </label>
+            {qaThumbnailFile && (
+              <p className="text-sm text-gray-700 mt-2">{qaThumbnailFile.name}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">File</label>

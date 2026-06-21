@@ -18,6 +18,14 @@ export interface TenantOrganizationDTO {
   subscriptionEndDate?: string;   // YYYY-MM-DD
   monthlyFeeUsd?: number;
   stripeCustomerId?: string;
+  description?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  stateProvince?: string;
+  zipCode?: string;
+  country?: string;
+  websiteUrl?: string;
   isActive?: boolean;
   createdAt: string; // ISO date-time
   updatedAt: string; // ISO date-time
@@ -62,14 +70,30 @@ export interface TenantSettingsDTO {
   emailFooterHtmlUrl?: string; // S3 URL for email footer HTML file
   emailHeaderImageUrl?: string; // S3 URL for email header image
   logoImageUrl?: string; // S3 URL for tenant logo image
+  /** JSON array of HTTPS URLs for tenant default homepage hero slideshow */
+  defaultHeroImageUrlsJson?: string;
+  /** slideshow | random | single */
+  defaultHeroDisplayMode?: 'slideshow' | 'random' | 'single';
+  /** When true, append tenant default slides after upcoming event hero images */
+  defaultHeroIncludeWithEvents?: boolean;
+  /** Max active slides shown on homepage rotation (1–6, default 6) */
+  defaultHeroMaxDisplayCount?: number;
   // Homepage edge cache version (cache-busting; bump to refresh CDN cache)
   homepageCacheVersion?: number;
-  // Contact and Address Fields
+  /** @deprecated v2.0 — canonical source is tenant_organization.description */
+  description?: string;
+  /** @deprecated v2.0 — use tenant_organization.addressLine1 */
   addressLine1?: string;
+  /** @deprecated v2.0 — use tenant_organization.addressLine2 */
   addressLine2?: string;
+  /** @deprecated v2.0 — use tenant_organization.city */
+  city?: string;
   phoneNumber?: string;
+  /** @deprecated v2.0 — use tenant_organization.zipCode */
   zipCode?: string;
+  /** @deprecated v2.0 — use tenant_organization.country */
   country?: string;
+  /** @deprecated v2.0 — use tenant_organization.stateProvince */
   stateProvince?: string;
   email?: string;
   // Social media URLs (Follow our journey / organization links)

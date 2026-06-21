@@ -95,12 +95,12 @@ const QuestionIcon = () => (
 );
 
 const quickLinks: QuickLink[] = [
-  { name: 'Kalpana', href: '/mosc-redesign/downloads/kalpana', icon: <DocumentIcon /> },
+  { name: 'Kalpana', href: '/mosc-redesign/kalpana-cms', icon: <DocumentIcon /> },
   { name: 'Downloads', href: '/mosc-redesign/downloads', icon: <DownloadIcon /> },
   { name: 'Institutions', href: '/mosc-redesign/institutions', icon: <BuildingIcon /> },
-  { name: 'Training', href: '/mosc-redesign/training', icon: <AcademicIcon /> },
+  { name: 'Training', href: '/mosc-redesign/training-cms', icon: <AcademicIcon /> },
   { name: 'Publications', href: '/mosc-redesign/publications', icon: <BookIcon /> },
-  { name: 'Spiritual Organisations', href: '/mosc-redesign/spiritual-organizations', icon: <HeartIcon /> },
+  { name: 'Spiritual Organisations', href: '/mosc-redesign/spiritual-organizations-cms', icon: <HeartIcon /> },
   { name: 'Theological Seminaries', href: '/mosc-redesign/theological-seminaries', icon: <ChurchIcon /> },
   { name: 'Calendar', href: '/mosc-redesign/liturgical-calendar', icon: <CalendarIcon /> },
   { name: 'Lectionary', href: '/mosc-redesign/lectionary', icon: <BookOpenIcon /> },

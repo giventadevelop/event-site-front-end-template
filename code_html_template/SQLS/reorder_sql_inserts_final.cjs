@@ -20,8 +20,10 @@ const TABLE_ORDER = [
   'event_live_update_attachment',
   'event_sponsors',      // parent of event_media.sponsor_id (fk_event_media_sponsor_id)
   'event_sponsors_join',
+  'gallery_category', // parent of gallery_album.gallery_category_id (fk_gallery_album_category)
   'gallery_album',   // parent of event_media.album_id (fk_event_media_album_id)
   'official_document_category', // parent of event_media.official_document_category_id (fk_event_media_official_document_category_id); see Latest_Schema_Post__Blob_Claude_12.sql
+  'official_document_year_bundle', // parent rows for year bundles; must precede event_media rows that reference bundles
   'event_media',
   'event_organizer',
   'event_poll',
@@ -49,12 +51,22 @@ const TABLE_ORDER = [
   'executive_committee_team_members',
   'event_recurrence_series',
   'focus_group',
+  'focus_group_members',
+  'event_focus_groups',
   'membership_plan',
+  'membership_subscription',
   'payment_provider_config',
   'promotion_email_template',
   'promotion_email_sent_log',
   'manual_payment_request',
+  'manual_payment_summary_report',
   'clerk_organization_role',
+  'batch_job_instance',
+  'batch_job_execution',
+  'batch_job_execution_context',
+  'batch_job_execution_params',
+  'batch_step_execution',
+  'batch_step_execution_context',
   'batch_job_execution_log',
   'bulk_operation_log',
   'databasechangelog',

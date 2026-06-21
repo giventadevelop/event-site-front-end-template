@@ -3,9 +3,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import type { TenantSettingsDTO, TenantSettingsFormDTO, TenantOrganizationDTO } from '@/app/admin/tenant-management/types';
-import { uploadEmailFooterHtmlClient, uploadTenantLogoClient, uploadEmailHeaderImageClient } from '@/app/admin/tenant-management/settings/ApiServerActions';
-import { patchTenantSetting } from '@/app/admin/tenant-management/settings/ApiServerActions';
+import {
+  uploadEmailFooterHtmlClient,
+  uploadTenantLogoClient,
+  uploadEmailHeaderImageClient,
+  patchTenantSetting,
+} from '@/app/admin/tenant-management/settings/ApiServerActions';
 import SaveStatusDialog, { type SaveStatus } from '@/components/SaveStatusDialog';
+import TenantDefaultHeroManager from '@/app/admin/tenant-management/components/TenantDefaultHeroManager';
+import TenantOrganizationSearchSelect from '@/app/admin/tenant-management/components/TenantOrganizationSearchSelect';
+import { stripDeprecatedSettingsIdentityFields } from '@/lib/resolveTenantOrganizationIdentity';
+import {
+  DEFAULT_HERO_MAX_DISPLAY_COUNT,
+  normalizeDefaultHeroDisplayMode,
+  normalizeMaxDisplayCount,
+  type DefaultHeroDisplayMode,
+} from '@/lib/hero/defaultHeroImages';
 
 interface TenantSettingsFormProps {
   initialData?: TenantSettingsDTO;
@@ -26,7 +39,9 @@ export default function TenantSettingsForm({
   availableOrganizations = [],
   settingsId: propSettingsId
 }: TenantSettingsFormProps) {
-  const [activeTab, setActiveTab] = useState<'general' | 'integrations' | 'limits' | 'customization'>('general');
+  const [activeTab, setActiveTab] = useState<
+    'general' | 'integrations' | 'limits' | 'homepageHero' | 'customization'
+  >('general');
   const [uploadingFooterHtml, setUploadingFooterHtml] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
@@ -85,13 +100,13 @@ export default function TenantSettingsForm({
       emailFooterHtmlUrl: initialData?.emailFooterHtmlUrl || '',
       emailHeaderImageUrl: initialData?.emailHeaderImageUrl || '',
       logoImageUrl: initialData?.logoImageUrl || '',
-      // Contact and Address Fields
-      addressLine1: initialData?.addressLine1 || '',
-      addressLine2: initialData?.addressLine2 || '',
+      defaultHeroImageUrlsJson: initialData?.defaultHeroImageUrlsJson || '',
+      defaultHeroDisplayMode: normalizeDefaultHeroDisplayMode(initialData?.defaultHeroDisplayMode),
+      defaultHeroIncludeWithEvents: initialData?.defaultHeroIncludeWithEvents ?? true,
+      defaultHeroMaxDisplayCount:
+        initialData?.defaultHeroMaxDisplayCount ?? DEFAULT_HERO_MAX_DISPLAY_COUNT,
+      // Operational contact (identity fields live on tenant_organization)
       phoneNumber: initialData?.phoneNumber || '',
-      zipCode: initialData?.zipCode || '',
-      country: initialData?.country || '',
-      stateProvince: initialData?.stateProvince || '',
       email: initialData?.email || '',
       // Social media URLs (Follow our journey)
       facebookUrl: initialData?.facebookUrl || '',
@@ -103,6 +118,10 @@ export default function TenantSettingsForm({
     }
   });
 
+  register('defaultHeroDisplayMode');
+  register('defaultHeroIncludeWithEvents');
+  register('defaultHeroMaxDisplayCount');
+
   // Get settings ID from prop or initialData (for edit mode)
   const settingsId = propSettingsId || initialData?.id;
 
@@ -111,13 +130,40 @@ export default function TenantSettingsForm({
   const emailFooterHtmlUrl = watch('emailFooterHtmlUrl');
   const emailHeaderImageUrl = watch('emailHeaderImageUrl');
   const logoImageUrl = watch('logoImageUrl');
+  const defaultHeroImageUrlsJson = watch('defaultHeroImageUrlsJson');
+  const defaultHeroDisplayMode = watch('defaultHeroDisplayMode');
+  const defaultHeroIncludeWithEvents = watch('defaultHeroIncludeWithEvents');
+  const defaultHeroMaxDisplayCount = watch('defaultHeroMaxDisplayCount');
+  const tenantIdForUpload =
+    watch('tenantId')?.trim() || initialData?.tenantId?.trim() || undefined;
+
+  const persistHeroSlides = async (json: string) => {
+    if (!settingsId) return;
+    setValue('defaultHeroImageUrlsJson', json);
+    const maxCount = normalizeMaxDisplayCount(
+      defaultHeroMaxDisplayCount ?? DEFAULT_HERO_MAX_DISPLAY_COUNT
+    );
+    await patchTenantSetting(settingsId, {
+      defaultHeroImageUrlsJson: json,
+      defaultHeroMaxDisplayCount: maxCount,
+    });
+  };
+
+  const handleMaxDisplayCountChange = async (count: number) => {
+    const normalized = normalizeMaxDisplayCount(count);
+    setValue('defaultHeroMaxDisplayCount', normalized);
+    if (settingsId) {
+      await patchTenantSetting(settingsId, { defaultHeroMaxDisplayCount: normalized });
+    }
+  };
 
   // Handle form submission
   const onFormSubmit = async (data: TenantSettingsFormDTO) => {
     try {
-      await onSubmit(data);
+      await onSubmit(stripDeprecatedSettingsIdentityFields(data) as TenantSettingsFormDTO);
     } catch (error) {
       console.error('Form submission error:', error);
+      throw error;
     }
   };
 
@@ -474,6 +520,14 @@ export default function TenantSettingsForm({
       color: 'purple',
       svgPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
     },
+    {
+      id: 'homepageHero',
+      label: 'Homepage Hero',
+      icon: 'photo',
+      color: 'teal',
+      svgPath:
+        'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+    },
     { 
       id: 'customization', 
       label: 'Customization', 
@@ -524,6 +578,17 @@ export default function TenantSettingsForm({
                   textActive: 'text-purple-700',
                   textInactive: 'text-purple-500'
                 };
+              } else if (color === 'teal') {
+                return {
+                  active: 'bg-teal-100 text-teal-600 border-teal-500',
+                  inactive: 'bg-teal-50 text-teal-400 border-transparent hover:bg-teal-100 hover:text-teal-500',
+                  iconBgActive: 'bg-teal-100',
+                  iconBgInactive: 'bg-teal-50',
+                  iconTextActive: 'text-teal-500',
+                  iconTextInactive: 'text-teal-400',
+                  textActive: 'text-teal-700',
+                  textInactive: 'text-teal-500',
+                };
               } else {
                 return {
                   active: 'bg-orange-100 text-orange-600 border-orange-500',
@@ -566,26 +631,26 @@ export default function TenantSettingsForm({
           <div className="space-y-6">
             <h3 className="text-lg font-medium text-gray-900">General Settings</h3>
 
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              Organization description, mailing address, and website are managed under{' '}
+              <strong>Tenant Organization → Edit</strong>, not tenant settings.
+            </div>
+
             {/* Tenant Selection (for create mode) */}
             {mode === 'create' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tenant Organization *
-                </label>
-                <select
+                <input
+                  type="hidden"
                   {...register('tenantId', { required: 'Please select a tenant organization' })}
-                  className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
-                >
-                  <option value="">Select Tenant Organization</option>
-                  {availableOrganizations.map((org) => (
-                    <option key={org.id} value={org.tenantId}>
-                      {org.organizationName} ({org.tenantId})
-                    </option>
-                  ))}
-                </select>
-                {errors.tenantId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.tenantId.message}</p>
-                )}
+                />
+                <TenantOrganizationSearchSelect
+                  value={watch('tenantId') || ''}
+                  onChange={(tenantId) =>
+                    setValue('tenantId', tenantId, { shouldValidate: true, shouldDirty: true })
+                  }
+                  initialOrganizations={availableOrganizations}
+                  error={errors.tenantId?.message}
+                />
               </div>
             )}
 
@@ -630,113 +695,6 @@ export default function TenantSettingsForm({
                 />
                 {errors.phoneNumber && (
                   <p className="mt-1 text-sm text-red-600">{errors.phoneNumber.message}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Address Information Section */}
-            <div className="space-y-4">
-              <h4 className="text-md font-medium text-gray-900">Address Information</h4>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Address Line 1
-                </label>
-                <input
-                  type="text"
-                  {...register('addressLine1', {
-                    maxLength: {
-                      value: 255,
-                      message: 'Address line 1 must be 255 characters or less'
-                    }
-                  })}
-                  className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
-                  placeholder="123 Main Street"
-                />
-                {errors.addressLine1 && (
-                  <p className="mt-1 text-sm text-red-600">{errors.addressLine1.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Address Line 2
-                </label>
-                <input
-                  type="text"
-                  {...register('addressLine2', {
-                    maxLength: {
-                      value: 255,
-                      message: 'Address line 2 must be 255 characters or less'
-                    }
-                  })}
-                  className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
-                  placeholder="Suite 100 (optional)"
-                />
-                {errors.addressLine2 && (
-                  <p className="mt-1 text-sm text-red-600">{errors.addressLine2.message}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    City / State / Province
-                  </label>
-                  <input
-                    type="text"
-                    {...register('stateProvince', {
-                      maxLength: {
-                        value: 100,
-                        message: 'State/Province must be 100 characters or less'
-                      }
-                    })}
-                    className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
-                    placeholder="California"
-                  />
-                  {errors.stateProvince && (
-                    <p className="mt-1 text-sm text-red-600">{errors.stateProvince.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Zip / Postal Code
-                  </label>
-                  <input
-                    type="text"
-                    {...register('zipCode', {
-                      maxLength: {
-                        value: 20,
-                        message: 'Zip code must be 20 characters or less'
-                      }
-                    })}
-                    className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
-                    placeholder="90210"
-                  />
-                  {errors.zipCode && (
-                    <p className="mt-1 text-sm text-red-600">{errors.zipCode.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Country
-                </label>
-                <input
-                  type="text"
-                  {...register('country', {
-                    maxLength: {
-                      value: 100,
-                      message: 'Country must be 100 characters or less'
-                    }
-                  })}
-                  className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
-                  placeholder="United States"
-                />
-                {errors.country && (
-                  <p className="mt-1 text-sm text-red-600">{errors.country.message}</p>
                 )}
               </div>
             </div>
@@ -1305,6 +1263,32 @@ export default function TenantSettingsForm({
           </div>
         )}
 
+        {/* Homepage Hero Tab */}
+        {activeTab === 'homepageHero' && (
+          <div className="space-y-6">
+            <input type="hidden" {...register('defaultHeroImageUrlsJson')} />
+            <input type="hidden" {...register('defaultHeroMaxDisplayCount')} />
+            <TenantDefaultHeroManager
+              settingsId={settingsId}
+              mode={mode}
+              tenantIdForUpload={tenantIdForUpload}
+              initialUrlsJson={defaultHeroImageUrlsJson}
+              displayMode={normalizeDefaultHeroDisplayMode(defaultHeroDisplayMode)}
+              includeWithEvents={defaultHeroIncludeWithEvents ?? true}
+              maxDisplayCount={
+                defaultHeroMaxDisplayCount ?? DEFAULT_HERO_MAX_DISPLAY_COUNT
+              }
+              onUrlsJsonChange={(json) => setValue('defaultHeroImageUrlsJson', json)}
+              onDisplayModeChange={(m: DefaultHeroDisplayMode) =>
+                setValue('defaultHeroDisplayMode', m)
+              }
+              onIncludeWithEventsChange={(v) => setValue('defaultHeroIncludeWithEvents', v)}
+              onMaxDisplayCountChange={(count) => void handleMaxDisplayCountChange(count)}
+              onPersistSlides={persistHeroSlides}
+            />
+          </div>
+        )}
+
         {/* Customization Tab */}
         {activeTab === 'customization' && (
           <div className="space-y-6">
@@ -1601,28 +1585,46 @@ export default function TenantSettingsForm({
         )}
 
         {/* Form Actions */}
-        <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
+        <div className="flex flex-row flex-wrap justify-end gap-3 sm:gap-4 pt-6 border-t border-gray-200">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-shrink-0 w-14 h-14 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
+            disabled={isSubmitting || loading}
+            className="flex-shrink-0 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center gap-3 px-6 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             title="Cancel"
             aria-label="Cancel"
           >
-            <svg className="w-10 h-10 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-200 flex items-center justify-center">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <span className="font-semibold text-blue-700">Cancel</span>
           </button>
           <button
             type="submit"
             disabled={isSubmitting || loading}
-            className="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={isSubmitting || loading ? 'Saving...' : mode === 'create' ? 'Create Settings' : 'Update Settings'}
-            aria-label={isSubmitting || loading ? 'Saving...' : mode === 'create' ? 'Create Settings' : 'Update Settings'}
+            className="flex-shrink-0 h-14 rounded-xl bg-green-100 hover:bg-green-200 flex items-center justify-center gap-3 px-6 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            title={isSubmitting || loading ? 'Saving...' : 'Save'}
+            aria-label={isSubmitting || loading ? 'Saving...' : 'Save'}
           >
-            <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-200 flex items-center justify-center">
+              {isSubmitting || loading ? (
+                <svg className="animate-spin w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className="font-semibold text-green-700">{isSubmitting || loading ? 'Saving...' : 'Save'}</span>
           </button>
         </div>
       </form>

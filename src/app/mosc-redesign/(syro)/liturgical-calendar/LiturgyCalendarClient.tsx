@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Anek_Malayalam } from 'next/font/google';
 import { useCalendarNav } from '@/app/calendar/hooks/useCalendarNav';
 import { fetchLiturgyDaysForMonthServer } from './ApiServerActions';
 import type { LiturgyCalendarItem, LiturgyCalendarView, LiturgyLanguage } from './types';
@@ -12,12 +11,6 @@ import { LiturgyWeekView } from './components/LiturgyWeekView';
 import { LiturgyDayView } from './components/LiturgyDayView';
 
 const BASE_PATH = '/mosc-redesign/liturgical-calendar';
-
-const anekMalayalam = Anek_Malayalam({
-  subsets: ['latin', 'malayalam'],
-  weight: ['400', '500', '600', '700'],
-  display: 'swap',
-});
 
 export default function LiturgyCalendarClient({
   initialItems,
@@ -59,11 +52,6 @@ export default function LiturgyCalendarClient({
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
-
-  const malayalamNeedsReimport = useMemo(
-    () => lng === 'ml' && items.some((item) => item.malayalamUsingEnglishFallback),
-    [lng, items],
-  );
 
   const nav = useCalendarNav(initialYear, initialMonth);
 
@@ -281,20 +269,6 @@ export default function LiturgyCalendarClient({
 
       <LiturgyViewSwitcher view={displayView} onChange={handleViewChange} />
 
-      {malayalamNeedsReimport && !loading && (
-        <div className="mb-4 inline-flex items-start gap-2 px-4 py-3 bg-amber-50 border-2 border-amber-300 rounded-lg shadow-sm max-w-full">
-          <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-sm text-amber-900 font-syro-primary">
-            Malayalam text in Strapi is not stored as Unicode (legacy font encoding from import). Showing
-            English for now. Re-import Malayalam from{' '}
-            <span className="font-semibold">Panjangom_26.pdf</span> as proper Unicode Malayalam in the{' '}
-            <span className="font-semibold">dayHeadingMalylm</span> and reading fields in Strapi admin.
-          </span>
-        </div>
-      )}
-
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-3">
@@ -305,21 +279,11 @@ export default function LiturgyCalendarClient({
             <span className="text-sm text-[#798daf] font-medium font-syro-primary">Loading liturgy calendar...</span>
           </div>
         </div>
-      ) : items.length === 0 && displayView === 'month' ? (
-        <div className="inline-flex items-center gap-2 px-4 py-3 bg-orange-50 border-2 border-orange-300 rounded-lg shadow-sm mb-4">
-          <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-sm text-orange-700 font-syro-primary">
-            No liturgy days found for this month. Ensure entries exist in Strapi for these dates and
-            are linked to your tenant (re-save in Strapi admin if tenant was not auto-assigned).
-          </span>
-        </div>
       ) : null}
 
       {!loading && (
         <div
-          className={lng === 'ml' && !malayalamNeedsReimport ? anekMalayalam.className : undefined}
+          className={lng === 'ml' ? 'font-anek-malayalam' : undefined}
           lang={lng === 'ml' ? 'ml' : 'en'}
         >
           {displayView === 'month' && (

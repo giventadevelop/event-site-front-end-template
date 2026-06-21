@@ -295,6 +295,20 @@ export interface OfficialDocumentYearBundleDTO {
 }
 
 /**
+ * DTO for gallery category (tenant-scoped lookup table).
+ */
+export interface GalleryCategoryDTO {
+  id: number;
+  tenantId?: string;
+  slug: string;
+  displayName: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
  * DTO for gallery album, matches backend schema.
  */
 export interface GalleryAlbumDTO {
@@ -305,6 +319,15 @@ export interface GalleryAlbumDTO {
   coverImageUrl?: string;
   isPublic?: boolean;
   displayOrder?: number;
+  albumYear?: number | null;
+  galleryCategoryId?: number | null;
+  galleryCategory?: GalleryCategoryDTO | null;
+  /** ISO date YYYY-MM-DD — event/visit start */
+  eventDateStart?: string | null;
+  /** ISO date YYYY-MM-DD — optional end for multi-day events */
+  eventDateEnd?: string | null;
+  /** City/venue shown after formatted date on cards, e.g. "Indore" */
+  eventLocation?: string | null;
   createdAt: string;
   updatedAt: string;
   createdById?: number;
@@ -658,6 +681,14 @@ export interface TenantOrganizationDTO {
   subscriptionEndDate?: string;   // date (YYYY-MM-DD)
   monthlyFeeUsd?: number;
   stripeCustomerId?: string;
+  description?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  stateProvince?: string;
+  zipCode?: string;
+  country?: string;
+  websiteUrl?: string;
   isActive?: boolean;
   createdAt: string; // date-time
   updatedAt: string; // date-time
@@ -691,12 +722,25 @@ export interface TenantSettingsDTO {
   showSponsorsSectionInHomePage?: boolean;
   isMembershipSubscriptionEnabled?: boolean;
   homepageCacheVersion?: number;
-  // Contact and Address Fields
+  /** @deprecated v2.0 — canonical source is tenant_organization.description */
+  description?: string;
+  defaultHeroImageUrlsJson?: string;
+  defaultHeroDisplayMode?: 'slideshow' | 'random' | 'single';
+  defaultHeroIncludeWithEvents?: boolean;
+  defaultHeroMaxDisplayCount?: number;
+  // Deprecated identity fields (read fallback only — use tenant_organization)
+  /** @deprecated v2.0 — use tenant_organization.addressLine1 */
   addressLine1?: string;
+  /** @deprecated v2.0 — use tenant_organization.addressLine2 */
   addressLine2?: string;
+  /** @deprecated v2.0 — use tenant_organization.city */
+  city?: string;
   phoneNumber?: string;
+  /** @deprecated v2.0 — use tenant_organization.zipCode */
   zipCode?: string;
+  /** @deprecated v2.0 — use tenant_organization.country */
   country?: string;
+  /** @deprecated v2.0 — use tenant_organization.stateProvince */
   stateProvince?: string;
   email?: string;
   // Social media URLs (Follow our journey / organization links)
@@ -946,6 +990,21 @@ export interface PromotionEmailSentLogDTO {
 }
 
 /**
+ * Payload for public contact form submissions (footer, contact page).
+ * SES from/to addresses are resolved server-side from tenant_email_addresses by emailType.
+ */
+export interface ContactFormSubmitDTO {
+  firstName: string;
+  lastName: string;
+  messageBody: string;
+  /** Visitor email (Reply-To and confirmation recipient). */
+  senderEmail: string;
+  /** Tenant email type used to look up verified from/copy-to addresses (e.g. CONTACT). */
+  emailType: TenantEmailAddressDTO['emailType'];
+  tenantId?: string;
+}
+
+/**
  * DTO for tenant email addresses, matching `tenant_email_addresses` table / backend schema.
  * Stores per-tenant "from" addresses categorized by type (INFO, SALES, TICKETS, CONTACT, etc.).
  */
@@ -957,7 +1016,13 @@ export interface TenantEmailAddressDTO {
    * Optional copy-to address that will be placed in the CC header for outgoing emails.
    * Maps to the `copy_to_email_address` column in the `tenant_email_addresses` table.
    */
-  copyToEmailAddress: string;
+  copyToEmailAddress?: string | null;
+  /**
+   * Optional Reply-To address for outbound emails of this type.
+   * When set, recipients reply to this address instead of the visitor/sender.
+   * Maps to the `reply_to_email_address` column in the `tenant_email_addresses` table.
+   */
+  replyToEmailAddress?: string | null;
   /**
    * Email address type:
    * INFO, SALES, TICKETS, CONTACT, SUPPORT, MARKETING, NOREPLY, ADMIN.
@@ -1670,6 +1735,16 @@ export type CompetitionType = 'INDIVIDUAL' | 'GROUP';
 export type CompetitionEligibleAudience = 'YOUTH_ONLY' | 'ADULT_ONLY' | 'ALL';
 export type CompetitionParticipantType = 'CHILD' | 'ADULT' | 'TEAM_MEMBER';
 export type CompetitionRegistrationStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'CANCELLED' | 'REFUNDED';
+export type CompetitionDisciplineCode =
+  | 'SONG'
+  | 'SPEECH'
+  | 'DANCE'
+  | 'MUSIC'
+  | 'SPORTS'
+  | 'ART'
+  | 'OTHER';
+export type CompetitionGroupMemberRole = 'CAPTAIN' | 'MEMBER';
+export type RegistrationActorMode = 'PARENT' | 'SELF' | 'TEAM_CAPTAIN';
 
 export interface EventCompetitionSettingsDTO {
   id?: number | null;
@@ -1682,11 +1757,14 @@ export interface EventCompetitionSettingsDTO {
   pointsFirst: number;
   pointsSecond: number;
   pointsThird: number;
+  pointsFourth?: number;
+  defaultMaxPlacements?: number;
   championEnabled: boolean;
   championExcludeGroupPoints: boolean;
   championMaxCategory?: number | null;
   resultsDisplayMode?: CompetitionResultsDisplayMode | null;
   eligibilityText?: string | null;
+  winnersPublishedEmailSentAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
   event?: EventDetailsDTO;
@@ -1723,6 +1801,15 @@ export interface EventCompetitionDTO {
   timeLimitMinutes?: number | null;
   requiresSoundtrack: boolean;
   judgmentCriteriaJson?: string | null;
+  disciplineCode?: CompetitionDisciplineCode | null;
+  minAge?: number | null;
+  maxAge?: number | null;
+  minGrade?: number | null;
+  maxGrade?: number | null;
+  maxPlacements?: number | null;
+  registrationDeadline?: string | null;
+  rulesMarkdown?: string | null;
+  requiresTeamName?: boolean;
   displayOrder: number;
   isActive: boolean;
   createdAt?: string;
@@ -1758,6 +1845,9 @@ export interface EventCompetitionRegistrationDTO {
   feeAmount: number;
   effectiveCategory?: string | null;
   stripePaymentIntentId?: string | null;
+  teamName?: string | null;
+  teamDisplayName?: string | null;
+  confirmationEmailSent?: boolean;
   createdAt?: string;
   updatedAt?: string;
   event?: EventDetailsDTO;
@@ -1765,6 +1855,29 @@ export interface EventCompetitionRegistrationDTO {
   participantProfile?: EventCompetitionParticipantDTO;
   groupLeaderRegistration?: EventCompetitionRegistrationDTO | null;
   registeredByUserProfile?: UserProfileDTO;
+}
+
+export interface EventCompetitionGroupMemberDTO {
+  id?: number | null;
+  tenantId?: string;
+  memberRole: CompetitionGroupMemberRole;
+  sortOrder: number;
+  createdAt?: string;
+  registration?: EventCompetitionRegistrationDTO;
+  participantProfile?: EventCompetitionParticipantDTO;
+}
+
+export interface CompetitionEligibilityCheckDTO {
+  eligible: boolean;
+  reasons: string[];
+}
+
+export interface TeamRegistrationRequestDTO {
+  leaderRegistration: Partial<EventCompetitionRegistrationDTO>;
+  memberParticipantIds: number[];
+  teamName?: string;
+  teamDisplayName?: string;
+  groupMembers?: EventCompetitionGroupMemberDTO[];
 }
 
 export interface EventCompetitionResultDTO {

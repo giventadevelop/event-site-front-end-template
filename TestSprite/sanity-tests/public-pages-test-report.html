@@ -204,7 +204,7 @@
         <div class="header">
             <h1>🧪 Public Pages Test Report</h1>
             <p>Malayalees US Site Event Registration Platform</p>
-            <p style="margin-top: 10px; font-size: 0.9em;">Test Engine: Playwright (Local) | 14 Tests | 92.9% Success Rate</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">Test Engine: Playwright (Local) | 14 Tests | 85.7% Success Rate</p>
         </div>
 
         <div class="summary">
@@ -216,11 +216,11 @@
                 </div>
                 <div class="summary-card">
                     <h3>Passed</h3>
-                    <div class="number passed">13</div>
+                    <div class="number passed">12</div>
                 </div>
                 <div class="summary-card">
                     <h3>Failed</h3>
-                    <div class="number failed">1</div>
+                    <div class="number failed">2</div>
                 </div>
                 <div class="summary-card">
                     <h3>Skipped</h3>
@@ -228,7 +228,7 @@
                 </div>
                 <div class="summary-card">
                     <h3>Success Rate</h3>
-                    <div class="number success-rate">92.9%</div>
+                    <div class="number success-rate">85.7%</div>
                 </div>
             </div>
         </div>
@@ -259,7 +259,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/</div>
-                        <div class="duration">3264ms</div>
+                        <div class="duration">19628ms</div>
                         
                     </div>
                 </div>
@@ -298,8 +298,8 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/events</div>
-                        <div class="duration">11394ms</div>
-                        <a href="screenshots/public-002-1777447616420.png" target="_blank" class="screenshot-link">📷 Screenshot</a>
+                        <div class="duration">20345ms</div>
+                        <a href="screenshots/public-002-1781796534493.png" target="_blank" class="screenshot-link">📷 Screenshot</a>
                     </div>
                 </div>
             
@@ -314,12 +314,15 @@
                         <p>Test completed successfully</p>
                         
                         <div class="warning-details">
-                            <strong>⚠️ Warnings:</strong> Some expected elements not found: [class*="date"], [class*="time"], [class*="location"]
+                            <strong>⚠️ Warnings:</strong> Network idle timeout - page may still be loading; Some expected elements not found: h1, [class*="event"], [class*="date"], [class*="time"], [class*="location"]; Interaction failed: page.waitForSelector: Timeout 5000ms exceeded.
+Call log:
+[2m  - waiting for locator('h1') to be visible[22m
+
                         </div>
                         
                         
                         <div class="error-details">
-                            <strong class="missing-elements">Missing Elements:</strong> <code>[class*="date"], [class*="time"], [class*="location"]</code>
+                            <strong class="missing-elements">Missing Elements:</strong> <code>h1</code>, <code>[class*="event"]</code>, <code>[class*="date"], [class*="time"], [class*="location"]</code>
                         </div>
                         
                         
@@ -334,7 +337,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/events/1</div>
-                        <div class="duration">3216ms</div>
+                        <div class="duration">25104ms</div>
                         
                     </div>
                 </div>
@@ -362,7 +365,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/sponsors</div>
-                        <div class="duration">2200ms</div>
+                        <div class="duration">5525ms</div>
                         
                     </div>
                 </div>
@@ -377,6 +380,14 @@
                         </h4>
                         <p>Test completed successfully</p>
                         
+                        <div class="warning-details">
+                            <strong>⚠️ Warnings:</strong> Some expected elements not found: h1, [class*="sponsor"], [class*="contact"], [class*="address"]
+                        </div>
+                        
+                        
+                        <div class="error-details">
+                            <strong class="missing-elements">Missing Elements:</strong> <code>h1</code>, <code>[class*="sponsor"]</code>, <code>[class*="contact"], [class*="address"]</code>
+                        </div>
                         
                         
                         
@@ -390,22 +401,35 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/sponsors/1</div>
-                        <div class="duration">3025ms</div>
+                        <div class="duration">5082ms</div>
                         
                     </div>
                 </div>
             
-                <div class="test-item passed">
-                    <div class="test-status">✅</div>
+                <div class="test-item failed">
+                    <div class="test-status">❌</div>
                     <div class="test-info">
                         <h4>
                             <span class="test-id">public-006</span>
                             Gallery Page Test
                             <span class="test-priority priority-high">high</span>
                         </h4>
-                        <p>Test completed successfully</p>
+                        <p>Error: page.goto: Timeout 30000ms exceeded.
+Call log:
+[2m  - navigating to "http://localhost:3000/gallery", waiting until "domcontentloaded"[22m
+</p>
                         
                         
+                        
+                        <div class="error-details">
+                            <strong>Errors:</strong>
+                            <ul>
+                                <li>page.goto: Timeout 30000ms exceeded.
+Call log:
+[2m  - navigating to "http://localhost:3000/gallery", waiting until "domcontentloaded"[22m
+</li>
+                            </ul>
+                        </div>
                         
                         
                         <div class="error-details">
@@ -418,7 +442,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/gallery</div>
-                        <div class="duration">1813ms</div>
+                        <div class="duration">30086ms</div>
                         
                     </div>
                 </div>
@@ -434,12 +458,12 @@
                         <p>Test completed successfully</p>
                         
                         <div class="warning-details">
-                            <strong>⚠️ Warnings:</strong> Some expected elements not found: [class*="vote"], [class*="option"]
+                            <strong>⚠️ Warnings:</strong> Some expected elements not found: h1, [class*="vote"], [class*="option"]
                         </div>
                         
                         
                         <div class="error-details">
-                            <strong class="missing-elements">Missing Elements:</strong> <code>[class*="vote"], [class*="option"]</code>
+                            <strong class="missing-elements">Missing Elements:</strong> <code>h1</code>, <code>[class*="vote"], [class*="option"]</code>
                         </div>
                         
                         
@@ -454,7 +478,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/polls</div>
-                        <div class="duration">1643ms</div>
+                        <div class="duration">7837ms</div>
                         
                     </div>
                 </div>
@@ -470,12 +494,12 @@
                         <p>Test completed successfully</p>
                         
                         <div class="warning-details">
-                            <strong>⚠️ Warnings:</strong> Some expected elements not found: [class*="calendar"], [class*="event"]
+                            <strong>⚠️ Warnings:</strong> Some expected elements not found: h1, [class*="event"]
                         </div>
                         
                         
                         <div class="error-details">
-                            <strong class="missing-elements">Missing Elements:</strong> <code>[class*="calendar"]</code>, <code>[class*="event"]</code>
+                            <strong class="missing-elements">Missing Elements:</strong> <code>h1</code>, <code>[class*="event"]</code>
                         </div>
                         
                         
@@ -490,7 +514,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/calendar</div>
-                        <div class="duration">1627ms</div>
+                        <div class="duration">6745ms</div>
                         
                     </div>
                 </div>
@@ -518,7 +542,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/mosc</div>
-                        <div class="duration">1789ms</div>
+                        <div class="duration">6993ms</div>
                         
                     </div>
                 </div>
@@ -554,7 +578,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/mosc/holy-synod</div>
-                        <div class="duration">2089ms</div>
+                        <div class="duration">5653ms</div>
                         
                     </div>
                 </div>
@@ -590,7 +614,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/mosc/gallery</div>
-                        <div class="duration">2489ms</div>
+                        <div class="duration">4112ms</div>
                         
                     </div>
                 </div>
@@ -626,7 +650,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/mosc/directory</div>
-                        <div class="duration">2590ms</div>
+                        <div class="duration">5837ms</div>
                         
                     </div>
                 </div>
@@ -662,7 +686,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/charity-theme</div>
-                        <div class="duration">7704ms</div>
+                        <div class="duration">14473ms</div>
                         
                     </div>
                 </div>
@@ -698,7 +722,7 @@
                     </div>
                     <div class="test-details">
                         <div class="url">/pricing</div>
-                        <div class="duration">1670ms</div>
+                        <div class="duration">11897ms</div>
                         
                     </div>
                 </div>
@@ -707,7 +731,7 @@
 
         <div class="footer">
             <p>Generated by Public Pages Test Suite</p>
-            <p class="timestamp">Report generated on: 4/29/2026, 7:27:35 AM</p>
+            <p class="timestamp">Report generated on: 6/18/2026, 3:31:11 PM</p>
             <p class="timestamp">Base URL: http://localhost:3000</p>
             <p class="timestamp">Test Engine: Playwright (Local Browser Execution)</p>
         </div>

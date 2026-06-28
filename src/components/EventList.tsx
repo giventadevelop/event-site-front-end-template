@@ -395,53 +395,51 @@ export function EventList({
                     </span>
                     {!isActive && onActivate && (
                       <button
-                        className="relative inline-flex items-center justify-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded border-2 border-green-800 shadow-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                        style={{
-                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.3)',
-                          borderStyle: 'outset',
-                        }}
+                        type="button"
+                        className="w-full flex-shrink-0 h-14 rounded-xl bg-green-100 hover:bg-green-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                         onClick={() => onActivate(event)}
                         disabled={isActive}
-                        title={isActive ? "Event is already active" : "Activate event"}
+                        title="Activate event"
+                        aria-label="Activate event"
                       >
-                        <div className="flex items-center gap-1.5">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-200 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span>Activate</span>
                         </div>
+                        <span className="font-semibold text-green-700">Activate</span>
                       </button>
                     )}
                   </div>
                 </td>
                 <td className="p-2 border text-center align-middle">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-center justify-center gap-1.5">
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={(e) => handleViewClick(event, e)}
-                        className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
+                        className="flex-shrink-0 w-14 h-14 rounded-xl bg-green-100 hover:bg-green-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
                         title="View event details"
                         aria-label="View event details"
                         type="button"
                       >
-                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-10 h-10 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
                       </button>
                       <a
                         href={`/admin/events/${event.id}/edit`}
-                        className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
+                        className="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
                         onClick={() => onEdit?.(event)}
                         title="Edit event details"
                         aria-label="Edit event details"
                       >
-                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </a>
                     </div>
-                    <span className="text-[10px] text-gray-600 block font-bold leading-tight">View / Edit<br />Event Details</span>
+                    <span className="text-[9px] text-gray-700 mt-1 block font-bold leading-tight">View / Edit<br />Event Details</span>
                   </div>
                 </td>
                 {/* Deactivate Button Cell */}

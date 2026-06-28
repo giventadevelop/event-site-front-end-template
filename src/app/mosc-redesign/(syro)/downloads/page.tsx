@@ -3,6 +3,8 @@ import {
   fetchPublicOfficialDocumentsTreeServer,
 } from './ApiServerActions';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DownloadsPage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
 }) {
@@ -15,9 +17,11 @@ export default async function DownloadsPage(props: {
     ? rawSearchParams?.categoryId[0]
     : rawSearchParams?.categoryId;
   const yearValue = Array.isArray(rawSearchParams?.year) ? rawSearchParams?.year[0] : rawSearchParams?.year;
+  const searchValue = Array.isArray(rawSearchParams?.q) ? rawSearchParams?.q[0] : rawSearchParams?.q;
   const page = Math.max(0, Number(pageValue || 1) - 1);
   const categoryId = Number(categoryIdValue || 0);
   const year = Number(yearValue || 0);
+  const search = typeof searchValue === 'string' ? searchValue.trim() : '';
 
   let officialTreePage = {
     content: [] as any[],
@@ -27,6 +31,7 @@ export default async function DownloadsPage(props: {
     size: 24,
     categoryOptions: [] as any[],
     yearOptions: [] as number[],
+    allYearOptions: [] as number[],
   };
 
   try {
@@ -35,6 +40,7 @@ export default async function DownloadsPage(props: {
       size: 24,
       categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : undefined,
       year: Number.isFinite(year) && year > 0 ? year : undefined,
+      search: search || undefined,
     });
   } catch {
     // keep defaults
@@ -47,6 +53,7 @@ export default async function DownloadsPage(props: {
         page: officialTreePage.page + 1,
         categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : null,
         year: Number.isFinite(year) && year > 0 ? year : null,
+        search,
       }}
     />
   );

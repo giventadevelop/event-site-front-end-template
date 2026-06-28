@@ -18,6 +18,11 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { formatDownloadCardTitle, getDownloadCardSubtitle } from '@/lib/downloads/formatDownloadCardTitle';
+import {
+  matchesDownloadSearchQuery,
+  resolveDownloadCardDisplayTitle,
+} from '@/lib/downloads/downloadSearch';
 
 const BANNER_DESCRIPTION =
   'Official documents available for download. Browse, filter, and download.';
@@ -28,14 +33,11 @@ type Props = {
     page: number;
     categoryId: number | null;
     year: number | null;
+    search: string;
   };
 };
 
 type TreeItem = PublicOfficialDocumentTreePage['content'][number];
-
-type DownloadSuccessState = {
-  fileName: string;
-};
 
 type DownloadErrorState = {
   fileName: string;
@@ -45,6 +47,15 @@ type DownloadErrorState = {
 function getFolderPath(item: TreeItem) {
   if (item.pathSegments.length <= 1) return 'Library Root';
   return item.pathSegments.slice(0, -1).join(' / ');
+}
+
+function getCardSubtitle(item: TreeItem) {
+  return getDownloadCardSubtitle({
+    pathSegments: item.pathSegments,
+    fileName: item.fileName,
+    title: item.title,
+    categoryLabel: item.categoryLabel,
+  });
 }
 
 const DIALOG_FOOTER_BUTTON_BASE =
@@ -86,114 +97,6 @@ function DialogCloseButton({ onClose, className = '' }: { onClose: () => void; c
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
       </svg>
     </button>
-  );
-}
-
-function DialogStep({
-  number,
-  tone,
-  children,
-}: {
-  number: number;
-  tone: 'blue' | 'green' | 'orange' | 'purple';
-  children: React.ReactNode;
-}) {
-  const toneClasses = {
-    blue: 'bg-blue-100 border-blue-300 text-blue-700',
-    green: 'bg-emerald-100 border-emerald-300 text-emerald-700',
-    orange: 'bg-orange-100 border-orange-300 text-orange-700',
-    purple: 'bg-purple-100 border-purple-300 text-purple-700',
-  }[tone];
-
-  return (
-    <li className="flex gap-3 items-start">
-      <span
-        className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 font-bold text-sm flex items-center justify-center ${toneClasses}`}
-      >
-        {number}
-      </span>
-      <p className="text-sm text-gray-700 leading-relaxed pt-1">{children}</p>
-    </li>
-  );
-}
-
-function DownloadSuccessDialog({
-  state,
-  open,
-  onClose,
-}: {
-  state: DownloadSuccessState | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!state) {
-    return null;
-  }
-
-  return (
-    <AlertDialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <AlertDialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border-2 border-syro-blue/40 shadow-2xl gap-0">
-        <div className="relative px-6 py-5 pr-14 text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-syro-blue">
-          <DialogCloseButton onClose={onClose} />
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-white/20 border-2 border-white/40 flex items-center justify-center shadow-lg">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <AlertDialogTitle className="font-syro-display text-xl sm:text-2xl text-white font-semibold pr-2">
-                Download started successfully!
-              </AlertDialogTitle>
-              <p className="text-sm text-white/90 mt-1">Your file is saving to your device.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-5 bg-gradient-to-b from-amber-50/80 via-syro-bg-gray to-white">
-          <div className="rounded-xl border-2 border-syro-gold/40 bg-white px-4 py-3 mb-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-syro-red mb-1">Your file</p>
-            <p className="font-semibold text-syro-blue break-all">{state.fileName}</p>
-          </div>
-
-          <AlertDialogDescription asChild>
-            <div>
-              <p className="text-sm font-semibold text-syro-blue mb-3">Where to find your file:</p>
-              <ol className="space-y-3 list-none m-0 p-0">
-                <DialogStep number={1} tone="green">
-                  Open your browser <strong className="text-emerald-700">Downloads page</strong>: press{' '}
-                  <strong>Ctrl+J</strong> (Windows) or <strong>Cmd+Shift+J</strong> (Mac), or click the{' '}
-                  <strong>Downloads ↓ icon</strong> in the toolbar. Your file should appear in that list — click it
-                  to open, or choose <strong>Show in folder</strong>.
-                </DialogStep>
-                <DialogStep number={2} tone="blue">
-                  Go to your <strong className="text-syro-blue">Downloads folder</strong> on your computer (File
-                  Explorer on Windows, Finder on Mac). Find <strong>{state.fileName}</strong> and double-click to
-                  open it.
-                </DialogStep>
-                <DialogStep number={3} tone="orange">
-                  If you do not see the file yet, wait a few seconds and check the download progress on the
-                  toolbar <strong>Downloads icon</strong>, then open the file from the downloads list or your
-                  Downloads folder.
-                </DialogStep>
-              </ol>
-            </div>
-          </AlertDialogDescription>
-        </div>
-
-        <DialogFooterActions
-          onClose={onClose}
-          okLabel="OK — Got it"
-          okClassName="bg-gradient-to-r from-syro-blue to-indigo-600"
-          closeClassName="bg-gradient-to-r from-syro-orange to-amber-500"
-        />
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }
 
@@ -261,129 +164,179 @@ function startOfficialDocumentDownload(downloadUrl: string, fileName: string) {
 
 function DownloadCard({
   file,
+  index,
   onDownload,
   downloadingId,
 }: {
   file: TreeItem;
+  index: number;
   onDownload: (file: TreeItem) => void;
   downloadingId: number | null;
 }) {
   const isDownloading = file.id != null && downloadingId === file.id;
   const thumbInput = {
     fileUrl: file.fileUrl,
-    thumbnailUrl: file.thumbnailUrl,
+    thumbnailUrl: file.thumbnailStorageUrl ?? file.thumbnailUrl,
     fileDataContentType: file.fileDataContentType,
     fileName: file.fileName,
     title: file.fileName,
   };
   const placeholderKind = getOfficialDocumentPlaceholderKind(thumbInput);
   const [thumbFailed, setThumbFailed] = React.useState(false);
-  const displayThumb = getOfficialDocumentCardThumbnailSrc(file.id, thumbInput);
+  const displayThumb = getOfficialDocumentCardThumbnailSrc(file.id, thumbInput, {
+    cacheKey: file.thumbnailCacheKey,
+    hasStoredThumbnail: file.hasCustomThumbnail,
+    // Stream the storage path the server already resolved, bypassing a stale by-id read.
+    srcHint: file.thumbnailStorageUrl,
+  });
   const showThumbnail = Boolean(displayThumb && !thumbFailed);
 
+  React.useEffect(() => {
+    setThumbFailed(false);
+  }, [displayThumb]);
+
+  const displayTitle = resolveDownloadCardDisplayTitle({
+    title: file.title,
+    fileName: file.fileName,
+    pathSegments: file.pathSegments,
+    categoryLabel: file.categoryLabel,
+    treePath: file.treePath,
+  });
+  const cardSubtitle = getCardSubtitle(file);
+  const displayIndex = String(index + 1).padStart(2, '0');
+  const metaLine = [file.categoryLabel, file.officialDocumentYear ? `Year ${file.officialDocumentYear}` : null]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <article className="bg-white rounded-xl border border-syro-gold/25 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden flex flex-col h-full">
-      <div className="relative w-full aspect-[16/10] bg-syro-bg-gray border-b border-syro-gold/20">
-        {showThumbnail ? (
-          // Native img: proxy thumbnails use 302 redirects; Next/Image lazy loading can stall on redirect chains.
-          <img
-            src={displayThumb!}
-            alt={file.fileName}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="eager"
-            decoding="async"
-            onError={() => setThumbFailed(true)}
-          />
+    <li className="download-entry-card group grid h-full grid-rows-subgrid overflow-hidden rounded-xl border border-burgundy/15 bg-white shadow-[rgba(50,50,93,0.18)_0px_8px_20px_-4px,rgba(0,0,0,0.2)_0px_4px_10px_-4px] transition-all duration-300 hover:border-burgundy/30 hover:shadow-[rgba(50,50,93,0.22)_0px_12px_28px_-4px,rgba(0,0,0,0.22)_0px_6px_14px_-4px] [grid-row:span_4]">
+      <header className="institution-entry-card__header download-entry-card__header flex h-full min-h-[5.25rem] items-start gap-3 self-stretch border-b border-burgundy/10 bg-gradient-to-r from-burgundy-dark to-burgundy px-4 py-3">
+        <span
+          className="institution-entry-card__index mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-parchment-light/20 font-syro-display text-sm font-bold"
+          aria-hidden
+        >
+          {displayIndex}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="institution-entry-card__title font-syro-display text-base font-semibold leading-snug break-words lg:text-lg">
+            {displayTitle}
+          </h3>
+          <p className="institution-entry-card__location mt-1 font-syro-primary text-sm leading-snug break-words">{cardSubtitle}</p>
+        </div>
+      </header>
+
+      <div className="download-entry-card__media h-[10.5rem] shrink-0 border-b border-burgundy/10 bg-syro-bg-gray/30 px-4 py-3">
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg bg-syro-bg-gray/20">
+          {showThumbnail ? (
+            <img
+              key={displayThumb}
+              src={displayThumb!}
+              alt={file.fileName}
+              className="download-entry-card__image h-full w-full object-contain"
+              loading="lazy"
+              decoding="async"
+              onError={() => setThumbFailed(true)}
+            />
+          ) : (
+            <div
+              className={`flex h-full w-full flex-col items-center justify-center px-3 py-2 bg-gradient-to-br ${placeholderGradient(placeholderKind)}`}
+              aria-label={file.fileName}
+            >
+              <p className="font-syro-display text-center text-sm font-semibold leading-tight text-syro-blue/90 sm:text-base line-clamp-4 break-words">
+                {displayTitle}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="download-entry-card__details flex min-h-[4.75rem] flex-col justify-start px-4 py-2.5">
+        {metaLine ? (
+          <p className="font-syro-primary text-xs font-semibold uppercase tracking-wide leading-snug text-syro-blue line-clamp-2 break-words">
+            {metaLine}
+          </p>
+        ) : null}
+        {file.description ? (
+          <p className={`font-syro-primary text-sm leading-snug text-syro-dark-gray lg:text-base ${metaLine ? 'mt-1' : ''} line-clamp-2`}>
+            {file.description}
+          </p>
         ) : (
-          <div
-            className={`absolute inset-0 flex flex-col items-center justify-center px-4 py-5 bg-gradient-to-br ${placeholderGradient(placeholderKind)}`}
-            aria-label={file.fileName}
-          >
-            <p className="font-syro-display text-sm sm:text-base font-semibold text-syro-blue/90 text-center leading-snug line-clamp-4">
-              {file.fileName}
-            </p>
-          </div>
+          <p className={`font-syro-primary text-sm leading-snug text-gray-500 ${metaLine ? 'mt-1' : ''} line-clamp-2`}>
+            Official document file ready for download.
+          </p>
         )}
-        <span className="absolute top-2 left-2 inline-flex items-center rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-syro-red shadow-sm">
+      </div>
+
+      <footer className="border-t border-burgundy/10 bg-parchment/40 px-5 py-4">
+        <p className="mb-3 font-syro-display text-xs font-semibold uppercase tracking-widest text-syro-blue">
           Download
-        </span>
-      </div>
-
-      <div className="p-5 flex flex-col flex-1">
-      {showThumbnail ? (
-        <h4 className="font-syro-display text-lg font-semibold text-syro-blue leading-snug line-clamp-2">
-          {file.fileName}
-        </h4>
-      ) : null}
-      <p className={`text-xs text-gray-500 line-clamp-2 ${showThumbnail ? 'mt-2' : ''}`}>{getFolderPath(file)}</p>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <span className="inline-flex items-center rounded-full bg-syro-bg-gray px-2.5 py-1 text-[11px] font-semibold text-syro-blue">
-          Priority {file.priorityRanking}
-        </span>
-        {file.officialDocumentYear ? (
-          <span className="inline-flex items-center rounded-full bg-syro-bg-gray px-2.5 py-1 text-[11px] font-semibold text-syro-blue">
-            Year {file.officialDocumentYear}
-          </span>
-        ) : null}
-        {file.categoryLabel ? (
-          <span className="inline-flex items-center rounded-full bg-syro-bg-gray px-2.5 py-1 text-[11px] font-semibold text-syro-blue">
-            {file.categoryLabel}
-          </span>
-        ) : null}
-      </div>
-
-      {file.description ? (
-        <p className="text-sm text-gray-600 mt-4 line-clamp-3">{file.description}</p>
-      ) : (
-        <p className="text-sm text-gray-500 mt-4 line-clamp-3">Official document file ready for download.</p>
-      )}
-
-      <div className="mt-auto pt-4 border-t border-syro-gold/20 flex justify-end">
+        </p>
         {file.downloadUrl ? (
           <button
             type="button"
             onClick={() => onDownload(file)}
             disabled={isDownloading}
-            className="syro-primary-button inline-flex items-center gap-2 text-sm px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="download-entry-card__action inline-flex w-full items-center justify-center gap-2 rounded-lg border border-syro-blue-secondary/20 bg-syro-blue-secondary px-4 py-2.5 font-syro-primary text-sm font-semibold text-white shadow-[0_4px_12px_rgba(1,30,148,0.18)] transition-all duration-300 hover:border-syro-blue hover:bg-syro-blue hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(11,40,72,0.28)] focus:outline-none focus:ring-2 focus:ring-syro-blue-secondary/35 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_12px_rgba(1,30,148,0.18)]"
+            title={isDownloading ? 'Preparing download' : 'Download file'}
+            aria-label={isDownloading ? 'Preparing download' : 'Download file'}
             aria-busy={isDownloading}
           >
             {isDownloading ? 'Preparing…' : 'Download'}
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
+            {isDownloading ? (
+              <svg className="h-4 w-4 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+            )}
           </button>
         ) : (
-          <span className="inline-flex items-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-400">
-            No link
+          <span className="inline-flex w-full items-center justify-center rounded-lg border border-burgundy/15 bg-white px-3 py-2.5 font-syro-primary text-xs font-semibold text-gray-400">
+            No download link
           </span>
         )}
-      </div>
-      </div>
-    </article>
+      </footer>
+    </li>
   );
 }
 
 function DownloadsGrid({
   files,
+  page,
+  pageSize,
   onDownload,
   downloadingId,
 }: {
   files: TreeItem[];
+  page: number;
+  pageSize: number;
   onDownload: (file: TreeItem) => void;
   downloadingId: number | null;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-      {files.map((file) => (
+    <ul className="downloads-entry-grid m-0 grid list-none grid-cols-1 gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+      {files.map((file, index) => (
         <DownloadCard
           key={`file-${file.id ?? file.treePath}`}
           file={file}
+          index={page * pageSize + index}
           onDownload={onDownload}
           downloadingId={downloadingId}
         />
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -470,8 +423,171 @@ const filterDropdownClass = (active: boolean, tone: 'year' | 'category') =>
       : 'border-syro-gold/40'
   }`;
 
+const MAX_DROPDOWN_YEARS = 20;
+
+function buildOlderYearDropdownOptions(
+  allYearOptions: number[],
+  currentCalendarYear: number,
+  priorCalendarYear: number
+): number[] {
+  const pinned = new Set([currentCalendarYear, priorCalendarYear]);
+  const fromData = [...new Set(allYearOptions)]
+    .filter((y) => !pinned.has(y))
+    .sort((a, b) => b - a);
+
+  if (fromData.length > 0) {
+    return fromData.slice(0, MAX_DROPDOWN_YEARS);
+  }
+
+  return Array.from({ length: MAX_DROPDOWN_YEARS }, (_, index) => currentCalendarYear - 2 - index);
+}
+
+function YearCombobox({
+  years,
+  selectedYear,
+  categoryId,
+  buildFilterHref,
+}: {
+  years: number[];
+  selectedYear: number | null;
+  categoryId: number | null;
+  buildFilterHref: (categoryId: number | null, year: number | null) => string;
+}) {
+  const router = useRouter();
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const listId = React.useId();
+  const currentCalendarYear = new Date().getFullYear();
+  const priorCalendarYear = currentCalendarYear - 1;
+
+  const dropdownYears = React.useMemo(
+    () => buildOlderYearDropdownOptions(years, currentCalendarYear, priorCalendarYear),
+    [years, currentCalendarYear, priorCalendarYear]
+  );
+
+  const isOlderYearSelected =
+    selectedYear != null &&
+    selectedYear !== currentCalendarYear &&
+    selectedYear !== priorCalendarYear;
+
+  const [open, setOpen] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState(
+    isOlderYearSelected && selectedYear != null ? String(selectedYear) : ''
+  );
+
+  React.useEffect(() => {
+    if (isOlderYearSelected && selectedYear != null) {
+      setInputValue(String(selectedYear));
+    } else if (!open) {
+      setInputValue('');
+    }
+  }, [isOlderYearSelected, selectedYear, open]);
+
+  React.useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
+  const filteredYears = React.useMemo(() => {
+    const query = inputValue.trim();
+    if (!query) return dropdownYears;
+    return dropdownYears.filter((year) => String(year).includes(query));
+  }, [dropdownYears, inputValue]);
+
+  const applyYear = (year: number | null) => {
+    setOpen(false);
+    if (year != null && selectedYear === year) {
+      router.push(buildFilterHref(categoryId, null));
+      setInputValue('');
+      return;
+    }
+    router.push(buildFilterHref(categoryId, year));
+    if (year != null) {
+      setInputValue(String(year));
+    }
+  };
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value.replace(/[^\d]/g, '').slice(0, 4));
+    setOpen(true);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const parsed = parseInt(inputValue.trim(), 10);
+      if (Number.isFinite(parsed) && parsed >= 1900 && parsed <= 2100) {
+        applyYear(parsed);
+      } else if (filteredYears.length === 1) {
+        applyYear(filteredYears[0]);
+      }
+    } else if (event.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  const comboboxActive = isOlderYearSelected || inputValue.trim().length > 0;
+
+  return (
+    <div ref={containerRef} className="relative inline-flex min-w-[11rem] max-w-[14rem]">
+      <label className="sr-only" htmlFor={listId}>
+        Filter by other years (type to search)
+      </label>
+      <input
+        id={listId}
+        type="text"
+        inputMode="numeric"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={`${listId}-listbox`}
+        aria-autocomplete="list"
+        aria-label="Filter by other years (type to search)"
+        placeholder="More years…"
+        value={inputValue}
+        onChange={(e) => handleInputChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
+        className={`w-full rounded-md border-2 px-3 py-1.5 text-xs font-semibold text-syro-blue bg-white focus:outline-none focus:ring-2 focus:ring-syro-blue/30 ${
+          comboboxActive ? 'border-syro-red bg-red-50' : 'border-syro-gold/40'
+        }`}
+      />
+      {open ? (
+        <ul
+          id={`${listId}-listbox`}
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-md border-2 border-syro-gold/40 bg-white py-1 shadow-lg"
+        >
+          {filteredYears.length > 0 ? (
+            filteredYears.map((year) => (
+              <li key={year} role="option" aria-selected={selectedYear === year}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyYear(year)}
+                  className={`block w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-red-50 ${
+                    selectedYear === year ? 'bg-red-50 text-syro-red' : 'text-syro-blue'
+                  }`}
+                >
+                  {year}
+                  {selectedYear === year ? ' (click to clear)' : ''}
+                </button>
+              </li>
+            ))
+          ) : (
+            <li className="px-3 py-2 text-xs text-gray-500">No matching years</li>
+          )}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function YearFilterBar({
-  yearOptions,
+  allYearOptions,
   currentFilters,
   buildFilterHref,
   searchQuery,
@@ -479,7 +595,7 @@ function YearFilterBar({
   onClearFilters,
   hasActiveFiltersOrSearch,
 }: {
-  yearOptions: number[];
+  allYearOptions: number[];
   currentFilters: { categoryId: number | null; year: number | null };
   buildFilterHref: (categoryId: number | null, year: number | null) => string;
   searchQuery: string;
@@ -487,21 +603,11 @@ function YearFilterBar({
   onClearFilters: () => void;
   hasActiveFiltersOrSearch: boolean;
 }) {
-  const router = useRouter();
   const currentCalendarYear = new Date().getFullYear();
   const priorCalendarYear = currentCalendarYear - 1;
 
-  const olderYearOptions = React.useMemo(() => {
-    const pinned = new Set([currentCalendarYear, priorCalendarYear]);
-    return yearOptions.filter((y) => !pinned.has(y));
-  }, [yearOptions, currentCalendarYear, priorCalendarYear]);
-
-  const dropdownValue =
-    currentFilters.year != null && olderYearOptions.includes(currentFilters.year)
-      ? String(currentFilters.year)
-      : '';
-
-  const dropdownActive = dropdownValue !== '';
+  const toggleYearHref = (year: number) =>
+    buildFilterHref(currentFilters.categoryId, currentFilters.year === year ? null : year);
 
   return (
     <div>
@@ -514,43 +620,25 @@ function YearFilterBar({
           All years
         </Link>
         <Link
-          href={buildFilterHref(currentFilters.categoryId, currentCalendarYear)}
+          href={toggleYearHref(currentCalendarYear)}
           className={yearFilterChipClass(currentFilters.year === currentCalendarYear)}
+          title={currentFilters.year === currentCalendarYear ? 'Click again to clear year filter' : undefined}
         >
           {currentCalendarYear}
         </Link>
         <Link
-          href={buildFilterHref(currentFilters.categoryId, priorCalendarYear)}
+          href={toggleYearHref(priorCalendarYear)}
           className={yearFilterChipClass(currentFilters.year === priorCalendarYear)}
+          title={currentFilters.year === priorCalendarYear ? 'Click again to clear year filter' : undefined}
         >
           {priorCalendarYear}
         </Link>
-        {olderYearOptions.length > 0 ? (
-          <label className="inline-flex items-center gap-2">
-            <span className="sr-only">Select another year</span>
-            <select
-              value={dropdownValue}
-              onChange={(e) => {
-                const next = e.target.value;
-                router.push(
-                  buildFilterHref(
-                    currentFilters.categoryId,
-                    next ? Number(next) : null
-                  )
-                );
-              }}
-              className={filterDropdownClass(dropdownActive, 'year')}
-              aria-label="Filter by other years"
-            >
-              <option value="">More years…</option>
-              {olderYearOptions.map((yr) => (
-                <option key={yr} value={String(yr)}>
-                  {yr}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
+        <YearCombobox
+          years={allYearOptions}
+          selectedYear={currentFilters.year}
+          categoryId={currentFilters.categoryId}
+          buildFilterHref={buildFilterHref}
+        />
 
         {/* Search documents — pushed to the right-most end of the filter row */}
         <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
@@ -567,7 +655,7 @@ function YearFilterBar({
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search documents…"
               className="w-full sm:w-56 rounded-md border-2 border-syro-gold/40 bg-white py-1.5 pl-9 pr-3 text-xs font-semibold text-syro-blue placeholder:font-normal placeholder:text-gray-400 focus:border-syro-blue focus:outline-none focus:ring-2 focus:ring-syro-blue/30"
-              aria-label="Search documents on this page"
+              aria-label="Search documents across the library"
             />
           </label>
           <button
@@ -624,16 +712,19 @@ function CategoryFilterBar({
         >
           All categories
         </Link>
-        {featured.map((cat) => (
-          <Link
-            key={cat.id}
-            href={buildFilterHref(cat.id, currentFilters.year)}
-            className={categoryFilterChipClass(currentFilters.categoryId === cat.id)}
-            title={cat.displayName}
-          >
-            {cat.displayName}
-          </Link>
-        ))}
+        {featured.map((cat) => {
+          const isActive = currentFilters.categoryId === cat.id;
+          return (
+            <Link
+              key={cat.id}
+              href={buildFilterHref(isActive ? null : cat.id, currentFilters.year)}
+              className={categoryFilterChipClass(isActive)}
+              title={isActive ? `${cat.displayName} — click again to clear` : cat.displayName}
+            >
+              {cat.displayName}
+            </Link>
+          );
+        })}
         {dropdownOptions.length > 0 ? (
           <label className="inline-flex shrink-0 items-center gap-2">
             <span className="sr-only">Select another document category</span>
@@ -641,8 +732,12 @@ function CategoryFilterBar({
               value={dropdownValue}
               onChange={(e) => {
                 const next = e.target.value;
+                const nextId = next ? Number(next) : null;
                 router.push(
-                  buildFilterHref(next ? Number(next) : null, currentFilters.year)
+                  buildFilterHref(
+                    nextId != null && nextId === currentFilters.categoryId ? null : nextId,
+                    currentFilters.year
+                  )
                 );
               }}
               className={filterDropdownClass(dropdownActive, 'category')}
@@ -672,35 +767,75 @@ export default function DownloadsPageClient({
   const currentPageZeroBased = Math.min(Math.max(officialTreePage.page, 0), totalPages - 1);
 
   const [downloadingId, setDownloadingId] = React.useState<number | null>(null);
-  const [downloadSuccess, setDownloadSuccess] = React.useState<DownloadSuccessState | null>(null);
   const [downloadError, setDownloadError] = React.useState<DownloadErrorState | null>(null);
-  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchQuery, setSearchQuery] = React.useState(currentFilters.search ?? '');
 
+  React.useEffect(() => {
+    setSearchQuery(currentFilters.search ?? '');
+  }, [currentFilters.search]);
+
+  const isServerSearch = Boolean(currentFilters.search?.trim());
   const filteredDownloads = React.useMemo(() => {
+    if (isServerSearch) return officialTreePage.content;
     const q = searchQuery.trim().toLowerCase();
     if (!q) return officialTreePage.content;
-    return officialTreePage.content.filter((file) => {
-      const haystack = [
-        file.fileName,
-        file.description ?? '',
-        file.categoryLabel ?? '',
-        getFolderPath(file),
-        file.officialDocumentYear ? String(file.officialDocumentYear) : '',
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [officialTreePage.content, searchQuery]);
+    return officialTreePage.content.filter((file) =>
+      matchesDownloadSearchQuery(
+        {
+          title: file.title,
+          fileName: file.fileName,
+          treePath: file.treePath,
+          pathSegments: file.pathSegments,
+          categoryLabel: file.categoryLabel,
+          description: file.description,
+          officialDocumentYear: file.officialDocumentYear,
+        },
+        q
+      )
+    );
+  }, [officialTreePage.content, searchQuery, isServerSearch]);
 
-  const isSearching = searchQuery.trim().length > 0;
+  const isSearching = Boolean(currentFilters.search?.trim() || searchQuery.trim());
   const hasActiveFilters = currentFilters.categoryId != null || currentFilters.year != null;
   const hasActiveFiltersOrSearch = hasActiveFilters || isSearching;
 
   const handleClearFilters = React.useCallback(() => {
     setSearchQuery('');
-    router.push('/mosc-redesign/downloads');
+    router.replace('/mosc-redesign/downloads');
+    router.refresh();
   }, [router]);
+
+  const pushSearchToUrl = React.useCallback(
+    (value: string) => {
+      const params = new globalThis.URLSearchParams();
+      params.set('page', '1');
+      if (currentFilters.categoryId) params.set('categoryId', String(currentFilters.categoryId));
+      if (currentFilters.year) params.set('year', String(currentFilters.year));
+      const trimmed = value.trim();
+      if (trimmed) params.set('q', trimmed);
+      router.replace(`/mosc-redesign/downloads?${params.toString()}`);
+      router.refresh();
+    },
+    [router, currentFilters.categoryId, currentFilters.year]
+  );
+
+  const searchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearchChange = React.useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = setTimeout(() => {
+        pushSearchToUrl(value);
+      }, 400);
+    },
+    [pushSearchToUrl]
+  );
+
+  React.useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
 
   const handleDownload = React.useCallback(async (file: TreeItem) => {
     if (!file.downloadUrl) {
@@ -730,10 +865,6 @@ export default function DownloadsPageClient({
       }
 
       startOfficialDocumentDownload(freshUrl, file.fileName);
-
-      setDownloadSuccess({
-        fileName: file.fileName,
-      });
     } catch (error) {
       setDownloadError({
         fileName: file.fileName,
@@ -749,6 +880,7 @@ export default function DownloadsPageClient({
     params.set('page', String(page));
     if (currentFilters.categoryId) params.set('categoryId', String(currentFilters.categoryId));
     if (currentFilters.year) params.set('year', String(currentFilters.year));
+    if (currentFilters.search?.trim()) params.set('q', currentFilters.search.trim());
     return `/mosc-redesign/downloads?${params.toString()}`;
   };
 
@@ -757,6 +889,7 @@ export default function DownloadsPageClient({
     params.set('page', '1');
     if (categoryId) params.set('categoryId', String(categoryId));
     if (year) params.set('year', String(year));
+    if (currentFilters.search?.trim()) params.set('q', currentFilters.search.trim());
     return `/mosc-redesign/downloads?${params.toString()}`;
   };
 
@@ -766,12 +899,6 @@ export default function DownloadsPageClient({
         title="Downloads"
         breadcrumbFrom="home"
         description={BANNER_DESCRIPTION}
-      />
-
-      <DownloadSuccessDialog
-        state={downloadSuccess}
-        open={!!downloadSuccess}
-        onClose={() => setDownloadSuccess(null)}
       />
 
       <DownloadErrorDialog
@@ -810,8 +937,10 @@ export default function DownloadsPageClient({
                     {isSearching ? (
                       <>
                         {' '}
-                        — search on this page:{' '}
-                        <span className="font-semibold">&ldquo;{searchQuery.trim()}&rdquo;</span>
+                        — search across library:{' '}
+                        <span className="font-semibold">
+                          &ldquo;{(currentFilters.search || searchQuery).trim()}&rdquo;
+                        </span>
                       </>
                     ) : null}
                     . Lower priority values are shown first.
@@ -824,11 +953,11 @@ export default function DownloadsPageClient({
               </div>
 
               <YearFilterBar
-                yearOptions={officialTreePage.yearOptions}
+                allYearOptions={officialTreePage.allYearOptions}
                 currentFilters={currentFilters}
                 buildFilterHref={queryWithFilter}
                 searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
+                onSearchChange={handleSearchChange}
                 onClearFilters={handleClearFilters}
                 hasActiveFiltersOrSearch={hasActiveFiltersOrSearch}
               />
@@ -843,8 +972,8 @@ export default function DownloadsPageClient({
             {isSearching ? (
               <div className="mb-4 text-sm text-gray-600">
                 Showing <span className="font-semibold">{filteredDownloads.length}</span> of{' '}
-                <span className="font-semibold">{officialTreePage.content.length}</span> files on this page matching{' '}
-                <span className="font-semibold">&ldquo;{searchQuery.trim()}&rdquo;</span>.
+                <span className="font-semibold">{officialTreePage.totalElements}</span> files matching{' '}
+                <span className="font-semibold">&ldquo;{(currentFilters.search || searchQuery).trim()}&rdquo;</span>.
               </div>
             ) : null}
 
@@ -852,15 +981,16 @@ export default function DownloadsPageClient({
               <div className="rounded-lg border border-syro-gold/25 bg-syro-bg-gray/50 px-5 py-6 text-sm text-gray-600 space-y-3">
                 {isSearching ? (
                   <p>
-                    No files on this page match &ldquo;{searchQuery.trim()}&rdquo;. Try a different search term or{' '}
+                    No files match &ldquo;{(currentFilters.search || searchQuery).trim()}&rdquo;. Try a different search term, or
+                    click the{' '}
                     <button
                       type="button"
                       onClick={handleClearFilters}
                       className="font-semibold text-syro-blue underline hover:text-syro-red"
                     >
-                      clear filters
-                    </button>
-                    .
+                      Clear filters
+                    </button>{' '}
+                    button to return to all downloads.
                   </p>
                 ) : hasActiveFilters ? (
                   <p>
@@ -870,11 +1000,15 @@ export default function DownloadsPageClient({
                       : currentFilters.categoryId
                         ? 'category'
                         : 'year'}
-                    . Try another filter, or{' '}
-                    <Link href={queryWithFilter(null, null)} className="font-semibold text-syro-blue underline hover:text-syro-red">
-                      view all downloads
-                    </Link>
-                    .
+                    . Try another filter, click an active category or year chip again to undo it, or click the{' '}
+                    <button
+                      type="button"
+                      onClick={handleClearFilters}
+                      className="font-semibold text-syro-blue underline hover:text-syro-red"
+                    >
+                      Clear filters
+                    </button>{' '}
+                    button to return to all downloads.
                   </p>
                 ) : (
                   <p>No files are available right now. Please check back later.</p>
@@ -883,6 +1017,8 @@ export default function DownloadsPageClient({
             ) : (
               <DownloadsGrid
                 files={filteredDownloads}
+                page={currentPageZeroBased}
+                pageSize={pageSize}
                 onDownload={handleDownload}
                 downloadingId={downloadingId}
               />
@@ -893,6 +1029,7 @@ export default function DownloadsPageClient({
               totalPages={totalPages}
               totalCount={officialTreePage.totalElements}
               pageSize={pageSize}
+              itemsOnPage={isSearching ? filteredDownloads.length : officialTreePage.content.length}
               buildPageHref={queryWithPage}
               itemLabel="files"
             />

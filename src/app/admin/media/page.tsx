@@ -6,10 +6,24 @@ import type { EventMediaDTO } from "@/types";
 import { FaUsers, FaPhotoVideo, FaCalendarAlt, FaTimes, FaChevronLeft, FaChevronRight, FaTicketAlt, FaUpload, FaTags, FaHome, FaFolderOpen } from 'react-icons/fa';
 import AdminNavigation from '@/components/AdminNavigation';
 import { Modal } from "@/components/Modal";
+import SaveStatusDialog, { type SaveStatus } from '@/components/SaveStatusDialog';
 import { formatInTimeZone } from 'date-fns-tz';
 import EventFormHelpTooltip from '@/components/EventFormHelpTooltip';
 import MediaImageSpecHelpContent from '@/components/MediaImageSpecHelpContent';
 import { getClientTenantId } from '@/lib/env';
+import { normalizeEventMediasList } from '@/lib/homepage/homepageApiNormalize';
+import {
+  getEventMediaDisplayThumbnailUrl,
+  getOfficialDocumentPlaceholderKind,
+  placeholderGradient,
+  placeholderLabel,
+} from '@/lib/officialDocumentThumbnail';
+import {
+  compareHeroMediaByDisplayOrder,
+  isHeroFlaggedMedia,
+  isHeroMediaDisplayDateValid,
+} from '@/lib/hero/heroSliderMedia';
+import { HOMEPAGE_CACHE_INVALIDATE_CHANNEL } from '@/lib/homepageCacheKeys';
 
 // Helper function for timezone-aware date formatting
 function formatDateInTimezone(dateString: string, timezone: string = 'America/New_York'): string {
@@ -23,6 +37,19 @@ function formatDateInTimezone(dateString: string, timezone: string = 'America/Ne
 }
 
 const MAX_MEDIA_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB per file (matches other admin upload UIs)
+const EXCLUDE_OFFICIAL_DOCS_QUERY = 'isEventManagementOfficialDocument.equals=false';
+const OFFICIAL_DOCUMENT_MEDIA_TYPE = 'TENANT_OFFICIAL_DOCUMENT';
+
+function isOfficialDocumentMedia(item: EventMediaDTO): boolean {
+  return (
+    Boolean(item.isEventManagementOfficialDocument) ||
+    (item.eventMediaType || '').toUpperCase() === OFFICIAL_DOCUMENT_MEDIA_TYPE
+  );
+}
+
+function filterNonOfficialMedia(items: EventMediaDTO[]): EventMediaDTO[] {
+  return items.filter((item) => !isOfficialDocumentMedia(item));
+}
 
 async function parseMediaUploadError(res: Response): Promise<string> {
   const text = await res.text();
@@ -49,7 +76,7 @@ interface EditMediaModalProps {
   loading: boolean;
 }
 
-type MediaCheckboxName = 'isPublic' | 'eventFlyer' | 'isEventManagementOfficialDocument' | 'isHeroImage' | 'isActiveHeroImage' | 'isFeaturedVideo' | 'isHomePageHeroImage' | 'isFeaturedEventImage' | 'isLiveEventImage';
+type MediaCheckboxName = 'isPublic' | 'eventFlyer' | 'isHeroImage' | 'isActiveHeroImage' | 'isFeaturedVideo' | 'isHomePageHeroImage' | 'isFeaturedEventImage' | 'isLiveEventImage';
 
 function EditMediaModal({ media, onClose, onSave, loading }: EditMediaModalProps) {
   console.log('EditMediaModal - media object:', media);
@@ -78,7 +105,6 @@ function EditMediaModal({ media, onClose, onSave, loading }: EditMediaModalProps
     fileSize: media.fileSize,
     isPublic: Boolean(media.isPublic),
     eventFlyer: Boolean(media.eventFlyer),
-    isEventManagementOfficialDocument: Boolean(media.isEventManagementOfficialDocument),
     preSignedUrl: media.preSignedUrl || '',
     preSignedUrlExpiresAt: media.preSignedUrlExpiresAt,
     altText: media.altText || '',
@@ -154,12 +180,6 @@ function EditMediaModal({ media, onClose, onSave, loading }: EditMediaModalProps
       if (name === 'isActiveHeroImage' && newValue) {
         updates.isHeroImage = true;
       }
-      if (name === 'isEventManagementOfficialDocument' && newValue) {
-        updates.eventFlyer = false;
-      }
-      if (name === 'eventFlyer' && newValue) {
-        updates.isEventManagementOfficialDocument = false;
-      }
       if (name === 'isFeaturedVideo' && !newValue) {
         updates.featuredVideoUrl = '';
       }
@@ -209,6 +229,30 @@ function EditMediaModal({ media, onClose, onSave, loading }: EditMediaModalProps
               onChange={(e) => setForm(prev => ({ ...prev, altText: e.target.value }))}
               className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700" htmlFor="displayOrder">
+              Display Order
+            </label>
+            <input
+              id="displayOrder"
+              type="number"
+              min={0}
+              value={form.displayOrder ?? ''}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  displayOrder: raw === '' ? undefined : Math.max(0, parseInt(raw, 10) || 0),
+                }));
+              }}
+              className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
+              placeholder="0"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Lower numbers appear first in the homepage hero slider (0 = highest priority). Used when Home Page Hero or Hero Image is enabled.
+            </p>
           </div>
 
           <div>
@@ -320,7 +364,6 @@ function EditMediaModal({ media, onClose, onSave, loading }: EditMediaModalProps
               {[
                 { name: 'isPublic' as const, label: 'Public' },
                 { name: 'eventFlyer' as const, label: 'Event Flyer' },
-                { name: 'isEventManagementOfficialDocument' as const, label: 'Official Doc' },
                 { name: 'isHeroImage' as const, label: 'Hero Image' },
                 { name: 'isActiveHeroImage' as const, label: 'Active Hero' },
                 { name: 'isFeaturedVideo' as const, label: 'Featured Video' },
@@ -416,6 +459,7 @@ function UploadMediaModal({
   isOpen,
   onClose,
   onSuccess,
+  onUploadError,
   onUploadStart,
   onUploadEnd,
   loading: externalLoading,
@@ -425,6 +469,7 @@ function UploadMediaModal({
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  onUploadError?: (message: string) => void;
   onUploadStart: () => void;
   onUploadEnd: () => void;
   loading: boolean;
@@ -435,7 +480,6 @@ function UploadMediaModal({
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<FileList | null>(null);
   const [eventFlyer, setEventFlyer] = useState(false);
-  const [isEventManagementOfficialDocument, setIsEventManagementOfficialDocument] = useState(false);
   const [isHeroImage, setIsHeroImage] = useState(false);
   const [isActiveHeroImage, setIsActiveHeroImage] = useState(false);
   const [isFeaturedEventImage, setIsFeaturedEventImage] = useState(false);
@@ -665,7 +709,7 @@ function UploadMediaModal({
       const fd = new FormData();
       fd.append("files", file);
       fd.append("eventFlyer", String(eventFlyer));
-      fd.append("isEventManagementOfficialDocument", String(isEventManagementOfficialDocument));
+      fd.append("isEventManagementOfficialDocument", "false");
       fd.append("isHeroImage", String(isHeroImage));
       fd.append("isActiveHeroImage", String(isActiveHeroImage));
       fd.append("isFeaturedEventImage", String(isFeaturedEventImage));
@@ -701,7 +745,6 @@ function UploadMediaModal({
       setDescription("");
       setFiles(null);
       setEventFlyer(false);
-      setIsEventManagementOfficialDocument(false);
       setIsHeroImage(false);
       setIsActiveHeroImage(false);
       setIsFeaturedEventImage(false);
@@ -712,7 +755,9 @@ function UploadMediaModal({
       setHeroDisplayDurationSeconds("");
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: unknown) {
-      setExternalMessage(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setExternalMessage(message);
+      onUploadError?.(message);
     } finally {
       setUploadProgress(null);
       onUploadEnd();
@@ -886,7 +931,6 @@ function UploadMediaModal({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { state: eventFlyer, set: setEventFlyer, label: "Event Flyer" },
-            { state: isEventManagementOfficialDocument, set: setIsEventManagementOfficialDocument, label: "Official Doc" },
             { state: isHeroImage, set: setIsHeroImage, label: "Hero Image" },
             { state: isActiveHeroImage, set: setIsActiveHeroImage, label: "Active Hero" },
             { state: isFeaturedEventImage, set: setIsFeaturedEventImage, label: "Featured Event" },
@@ -1023,6 +1067,8 @@ export default function AdminMediaPage() {
 
   // Message popup (replaces window.alert)
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1030,11 +1076,46 @@ export default function AdminMediaPage() {
         setLoading(true);
         setError(null);
         try {
-          // First load: no checkbox filters (Event Flyer / Hero) so we show a paginated list of all media.
-          // Filters are applied only after first load completes (filtersEnabled) and user checks a box.
-          // Always include tenantId so backend returns media for current tenant (required for multi-tenant).
           const tenantId = getClientTenantId();
-          let url = `/api/proxy/event-medias?page=${page}&size=${pageSize}&sort=updatedAt,desc`;
+          const tenantQuery = tenantId ? `&tenantId.equals=${encodeURIComponent(tenantId)}` : '';
+
+          if (filtersEnabled && heroImagesOnly) {
+            // Match homepage hero slider: merge isHeroImage + isHomePageHeroImage, sort by displayOrder.
+            const [resHero, resHome] = await Promise.all([
+              fetch(`/api/proxy/event-medias?size=100&sort=displayOrder,asc&isHeroImage.equals=true&${EXCLUDE_OFFICIAL_DOCS_QUERY}${tenantQuery}`),
+              fetch(`/api/proxy/event-medias?size=100&sort=displayOrder,asc&isHomePageHeroImage.equals=true&${EXCLUDE_OFFICIAL_DOCS_QUERY}${tenantQuery}`),
+            ]);
+            if (!resHero.ok && !resHome.ok) {
+              throw new Error(await parseMediaUploadError(resHero.ok ? resHome : resHero));
+            }
+            const seenIds = new Set<number>();
+            const merged: EventMediaDTO[] = [];
+            for (const res of [resHero, resHome]) {
+              if (!res.ok) continue;
+              const data = await res.json();
+              for (const item of normalizeEventMediasList(data)) {
+                if (
+                  !isHeroFlaggedMedia(item) ||
+                  !isHeroMediaDisplayDateValid(item) ||
+                  item.id == null ||
+                  seenIds.has(item.id)
+                ) {
+                  continue;
+                }
+                seenIds.add(item.id);
+                merged.push(item);
+              }
+            }
+            merged.sort(compareHeroMediaByDisplayOrder);
+            const nonOfficial = filterNonOfficialMedia(merged);
+            const filtered = searchTerm
+              ? nonOfficial.filter((m) => m.title?.toLowerCase().includes(searchTerm.toLowerCase()))
+              : nonOfficial;
+            const start = page * pageSize;
+            setMediaList(filtered.slice(start, start + pageSize));
+            setTotalCount(filtered.length);
+          } else {
+          let url = `/api/proxy/event-medias?page=${page}&size=${pageSize}&sort=updatedAt,desc&${EXCLUDE_OFFICIAL_DOCS_QUERY}`;
           if (tenantId) {
             url += `&tenantId.equals=${encodeURIComponent(tenantId)}`;
           }
@@ -1047,16 +1128,13 @@ export default function AdminMediaPage() {
             url += `&eventFlyer.equals=true`;
           }
 
-          if (filtersEnabled && heroImagesOnly) {
-            url += `&isHeroImage.equals=true`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error(await parseMediaUploadError(res));
           }
 
-          const res = await fetch(url);
-          if (!res.ok) throw new Error("Failed to fetch media files");
-
           const data = await res.json();
-          // Backend may return array, or paged { content: [], totalElements: N } or { content: [], total_elements: N }
-          const list = Array.isArray(data) ? data : (data?.content != null ? data.content : [data]);
+          const list = filterNonOfficialMedia(normalizeEventMediasList(data));
           setMediaList(list);
 
           // Get total count from header or response (camelCase or snake_case); required for pagination
@@ -1085,6 +1163,7 @@ export default function AdminMediaPage() {
           if (process.env.NODE_ENV === 'development' && total <= pageSize && list.length === pageSize) {
             console.warn('[Admin Media] Total count may be wrong (only one page). Response keys:', data && typeof data === 'object' ? Object.keys(data) : [], 'total:', total, 'list.length:', list.length);
           }
+          }
 
           // Enable filter checkboxes after first successful load (no checkbox filters applied)
           if (!filtersEnabled && !eventFlyerOnly && !heroImagesOnly) {
@@ -1092,6 +1171,8 @@ export default function AdminMediaPage() {
           }
         } catch (e: any) {
           setError(e.message || "Failed to load media files");
+          setMediaList([]);
+          setTotalCount(0);
         } finally {
           setLoading(false);
         }
@@ -1174,19 +1255,56 @@ export default function AdminMediaPage() {
   const handleSave = async (updated: Partial<EventMediaDTO>) => {
     if (!editMedia || !editMedia.id) return;
     setEditLoading(true);
+    setSaveStatus('saving');
+    setSaveMessage('Please wait while we save your media changes.');
+
     try {
       const res = await fetch(`/api/proxy/event-medias/${editMedia.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/merge-patch+json' },
         body: JSON.stringify(updated),
       });
-      if (!res.ok) throw new Error('Failed to update media');
+
+      if (!res.ok) {
+        let errorMessage = 'Failed to update media';
+        try {
+          const errorText = await res.text();
+          try {
+            const errorJson = JSON.parse(errorText) as { detail?: string; message?: string; title?: string };
+            if (errorJson.detail) {
+              errorMessage = errorJson.detail.length > 150 ? `${errorJson.detail.substring(0, 150)}...` : errorJson.detail;
+            } else if (errorJson.message) {
+              errorMessage = errorJson.message;
+            } else if (errorJson.title) {
+              errorMessage = errorJson.title;
+            }
+          } catch {
+            errorMessage = errorText.length > 200 ? `${errorText.substring(0, 200)}...` : errorText || errorMessage;
+          }
+        } catch {
+          errorMessage = 'Failed to update media. Please try again.';
+        }
+        throw new Error(errorMessage);
+      }
+
       const result = await res.json();
       setMediaList(prev => prev.map(m => m.id === editMedia.id ? { ...m, ...result } : m));
-      handleCloseModal();
-    } catch (error: any) {
+      if (typeof BroadcastChannel !== 'undefined') {
+        new BroadcastChannel(HOMEPAGE_CACHE_INVALIDATE_CHANNEL).postMessage('invalidate');
+      }
+
+      setSaveStatus('success');
+      setSaveMessage('Your media has been saved successfully.');
+
+      setTimeout(() => {
+        handleCloseModal();
+        setSaveStatus('idle');
+        setSaveMessage('');
+      }, 1500);
+    } catch (error: unknown) {
       console.error('Failed to save media:', error);
-      setAlertMessage(`Error: ${error.message}`);
+      setSaveStatus('error');
+      setSaveMessage(error instanceof Error ? error.message : 'Failed to save media. Please try again.');
     } finally {
       setEditLoading(false);
     }
@@ -1257,7 +1375,9 @@ export default function AdminMediaPage() {
   const startItem = page * pageSize + 1;
   const endItem = Math.min((page + 1) * pageSize, totalCount);
 
-  const sortedMedia = [...mediaList].sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+  const sortedMedia = heroImagesOnly
+    ? [...mediaList]
+    : [...mediaList].sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
   const pageItemIds = sortedMedia.filter((m): m is EventMediaDTO & { id: number } => m.id != null).map(m => m.id);
   const allOnPageSelected = pageItemIds.length > 0 && pageItemIds.every(id => selectedMediaIds.has(id));
 
@@ -1272,10 +1392,6 @@ export default function AdminMediaPage() {
       setSelectedMediaIds(prev => new Set([...prev, ...pageItemIds]));
     }
   };
-
-  if (error) {
-    return <div className="text-red-500 text-center p-8">{error}</div>;
-  }
 
   return (
     <div ref={pageTopRef} className="w-[80%] mx-auto py-8" style={{ paddingTop: '118px' }}>
@@ -1317,6 +1433,27 @@ export default function AdminMediaPage() {
             <span className="font-semibold text-blue-700 hidden sm:inline">Upload New Media</span>
           </button>
         </div>
+      </div>
+
+      {/* Info: official documents are managed on a separate admin page */}
+      <div className="mb-4 px-4 py-3 rounded-lg border-2 border-indigo-300 bg-indigo-50 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-indigo-900">
+            Images, videos, and audio only
+          </p>
+          <p className="text-xs text-indigo-800 mt-1">
+            This page lists photos, videos, flyers, and hero images for events and the site. Official documents (PDFs and published downloads) are not shown here — use the Official Documents page to view and manage them.
+          </p>
+        </div>
+        <Link
+          href="/admin/official-documents"
+          className="flex-shrink-0 inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-semibold transition-all duration-300 hover:scale-105 border-2 border-indigo-300"
+          title="Manage Official Documents"
+          aria-label="Manage Official Documents"
+        >
+          <FaFolderOpen className="w-5 h-5 text-indigo-600" />
+          <span>Official Documents</span>
+        </Link>
       </div>
 
       {/* Info tip: point to ? button for image specification */}
@@ -1436,12 +1573,22 @@ export default function AdminMediaPage() {
           <span className="font-semibold">💡 Tip:</span>
           <span>
             Click the <strong>View</strong> button on a card to see full details. Click the × button to close the dialog.
+            {heroImagesOnly && (
+              <> Hero list matches the homepage slider (Hero or Home Page Hero flags on <strong>upcoming</strong> events), sorted by <strong>Display Order</strong>. Past events are excluded on the homepage. The default poster at the end of the slider is not stored in media.</>
+            )}
           </span>
         </div>
       </div>
 
+      {error && (
+        <div className="mb-6 px-4 py-3 rounded-lg border-2 border-red-300 bg-red-50 shadow-sm" role="alert">
+          <p className="text-sm font-semibold text-red-800">Could not load media files</p>
+          <p className="text-sm text-red-700 mt-1">{error}</p>
+        </div>
+      )}
+
       {loading && <div className="text-center p-8">Loading media...</div>}
-      {!loading && sortedMedia.length === 0 && <div className="text-center p-8">No media found.</div>}
+      {!loading && !error && sortedMedia.length === 0 && <div className="text-center p-8">No media found.</div>}
       {!loading && sortedMedia.length > 0 && (
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-700 via-gray-800 to-gray-700 border border-gray-600/30 shadow-2xl mb-8">
           {/* Medium Dark Radial Gradient Overlay */}
@@ -1505,9 +1652,14 @@ export default function AdminMediaPage() {
           {sortedMedia.map((item, index) => {
             const serialNumber = page * pageSize + index + 1;
             const isSelected = item.id != null && selectedMediaIds.has(item.id);
+            const displayThumbnailUrl = getEventMediaDisplayThumbnailUrl(item, {
+              thumbnailExpiresAtIso: item.thumbnailPreSignedUrlExpiresAt,
+              fileExpiresAtIso: item.preSignedUrlExpiresAt,
+            });
+            const placeholderKind = getOfficialDocumentPlaceholderKind(item);
             return (
               <div
-                key={item.id}
+                key={item.id ?? `media-${serialNumber}`}
                 data-serial-number={serialNumber}
                 className="relative bg-white rounded-lg shadow-md overflow-hidden group flex flex-col justify-between"
               >
@@ -1539,9 +1691,15 @@ export default function AdminMediaPage() {
                     <div className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded-full text-sm font-bold z-10 shadow-lg">
                       #{serialNumber}
                     </div>
-                    {item.fileUrl && (
+                    {heroImagesOnly && item.displayOrder != null && (
+                      <div className="absolute top-2 left-14 bg-purple-600 text-white px-2 py-1 rounded-full text-xs font-bold z-10 shadow-lg" title="Homepage hero display order">
+                        Order {item.displayOrder}
+                      </div>
+                    )}
+                    {displayThumbnailUrl ? (
                       <img
-                        src={item.fileUrl.startsWith('http') ? item.fileUrl : `https://placehold.co/600x400?text=${item.title}`}
+                        key={displayThumbnailUrl}
+                        src={displayThumbnailUrl}
                         alt={item.altText || item.title || ''}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -1550,6 +1708,11 @@ export default function AdminMediaPage() {
                           target.src = `https://placehold.co/600x400?text=No+Image`;
                         }}
                       />
+                    ) : (
+                      <div className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-br ${placeholderGradient(placeholderKind)}`}>
+                        <span className="text-2xl font-bold text-gray-600">{placeholderLabel(placeholderKind)}</span>
+                        <span className="text-xs text-gray-500 mt-1 px-2 text-center truncate max-w-full">{item.eventMediaType || 'Media'}</span>
+                      </div>
                     )}
                   </div>
                   <div className="p-4">
@@ -1558,16 +1721,16 @@ export default function AdminMediaPage() {
                   </div>
                 </div>
                 {/* Action Buttons: View, Edit, Delete */}
-                <div className="p-4 pt-0 flex items-center justify-start gap-1.5">
+                <div className="p-4 pt-0 flex items-center justify-start gap-2">
                   {/* View Button */}
                   <button
                     onClick={(e) => handleViewClick(item, e, serialNumber)}
-                    className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
+                    className="flex-shrink-0 w-14 h-14 rounded-xl bg-green-100 hover:bg-green-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
                     title="View details"
                     aria-label="View details"
                     type="button"
                   >
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
@@ -1575,24 +1738,24 @@ export default function AdminMediaPage() {
                   {/* Edit Button */}
                   <button
                     onClick={() => handleEditClick(item)}
-                    className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
+                    className="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
                     title="Edit Media"
                     aria-label="Edit Media"
                     type="button"
                   >
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </button>
                   {/* Delete Button */}
                   <button
                     onClick={() => handleDelete(item)}
-                    className="flex-shrink-0 w-10 h-10 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
+                    className="flex-shrink-0 w-14 h-14 rounded-xl bg-red-100 hover:bg-red-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
                     title="Delete Media"
                     aria-label="Delete Media"
                     type="button"
                   >
-                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
@@ -1788,8 +1951,24 @@ export default function AdminMediaPage() {
         <UploadMediaModal
           isOpen={isUploadModalOpen}
           onClose={() => { setIsUploadModalOpen(false); setUploadMessage(null); }}
-          onSuccess={() => setRefreshKey(k => k + 1)}
-          onUploadStart={() => setUploadLoading(true)}
+          onSuccess={() => {
+            setRefreshKey(k => k + 1);
+            setSaveStatus('success');
+            setSaveMessage('Your media has been uploaded successfully.');
+            setTimeout(() => {
+              setSaveStatus('idle');
+              setSaveMessage('');
+            }, 1500);
+          }}
+          onUploadError={(message) => {
+            setSaveStatus('error');
+            setSaveMessage(message);
+          }}
+          onUploadStart={() => {
+            setUploadLoading(true);
+            setSaveStatus('saving');
+            setSaveMessage('Please wait while your media files are uploaded.');
+          }}
           onUploadEnd={() => setUploadLoading(false)}
           loading={uploadLoading}
           message={uploadMessage}
@@ -1817,7 +1996,7 @@ export default function AdminMediaPage() {
                         {value ? 'Yes' : 'No'}
                       </span>
                     ) : value instanceof Date ? value.toLocaleString() :
-                      (key.toLowerCase().includes('date') || key.toLowerCase().includes('at')) && value ? formatDateInTimezone(value, 'America/New_York') :
+                      (key.toLowerCase().includes('date') || key.toLowerCase().includes('at')) && value != null && value !== '' ? formatDateInTimezone(String(value), 'America/New_York') :
                         value === null || value === undefined || value === '' ? <span className="text-gray-400 italic">(empty)</span> : String(value)}
                   </div>
                 </div>
@@ -1825,6 +2004,18 @@ export default function AdminMediaPage() {
           </div>
         </Modal>
       )}
+
+      <SaveStatusDialog
+        isOpen={saveStatus !== 'idle'}
+        status={saveStatus}
+        message={saveMessage}
+        onClose={() => {
+          if (saveStatus === 'error') {
+            setSaveStatus('idle');
+            setSaveMessage('');
+          }
+        }}
+      />
     </div>
   );
 }
